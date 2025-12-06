@@ -129,8 +129,24 @@ export async function GET(request: NextRequest) {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
+    // Sync totalEntries with actual database count to ensure accuracy
+    const actualEntryCount = await EntryModel.countDocuments({ userId: session.user.id });
+    
+    // Update user stats if there's a discrepancy (need to fetch non-lean user for saving)
+    if (user && user.stats.totalEntries !== actualEntryCount) {
+      const userDoc = await UserModel.findById(session.user.id);
+      if (userDoc) {
+        userDoc.stats.totalEntries = actualEntryCount;
+        await userDoc.save();
+      }
+    }
+
     return NextResponse.json({
-      stats: user?.stats || { totalEntries: 0, currentStreak: 0, longestStreak: 0 },
+      stats: {
+        totalEntries: actualEntryCount,
+        currentStreak: user?.stats?.currentStreak || 0,
+        longestStreak: user?.stats?.longestStreak || 0,
+      },
       chartData,
     });
   } catch (error) {

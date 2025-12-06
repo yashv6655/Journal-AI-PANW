@@ -10,8 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SentimentBadge } from '@/components/entries/SentimentBadge';
 import { WritingPromptBubble } from '@/components/entries/WritingPromptBubble';
-import { ArrowLeft, Save, Loader2, X, Clock } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, X, Clock, Mic, Keyboard } from 'lucide-react';
 import type { SentimentResult, PromptResponse, WritingPromptResponse } from '@/types';
+import { VoiceJournal } from '@/components/entries/VoiceJournal';
 
 // Configuration constants
 const WORD_THRESHOLD = 20; // Show prompt every 20 words
@@ -28,6 +29,7 @@ export default function NewEntryPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedEntry, setSavedEntry] = useState<any>(null);
+  const [entryMode, setEntryMode] = useState<'text' | 'voice'>('text');
   
   // Writing prompt states
   const [showPrompt, setShowPrompt] = useState(false);
@@ -335,104 +337,164 @@ export default function NewEntryPage() {
           </Card>
         )}
 
-        {/* Editor */}
+        {/* Entry Mode Toggle */}
         <Card>
-          <CardContent className="p-6">
-            <div className="relative flex gap-4">
-              <div className="flex-1">
-                <Textarea
-                  value={content}
-                  onChange={(e) => {
-                    setContent(e.target.value);
-                    // If completion message is showing and user continues typing, hide it
-                    if (showPrompt && promptType === 'completion') {
-                      setShowPrompt(false);
-                    }
-                  }}
-                  placeholder="Start writing your thoughts here... Don't worry about perfection, just let your thoughts flow."
-                  className="min-h-[400px] text-base leading-relaxed"
+          <CardContent className="p-4">
+            <div className="flex items-center justify-center gap-4">
+              <span className="text-sm font-medium text-muted-foreground">Entry Mode:</span>
+              <div className="flex gap-2">
+                <Button
+                  variant={entryMode === 'text' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setEntryMode('text')}
                   disabled={saving}
-                />
-              </div>
-              {/* Writing Prompt Bubble */}
-              {showPrompt && (promptType === 'completion' ? currentMessage : currentQuestion) && (
-                <WritingPromptBubble
-                  type={promptType}
-                  message={promptType === 'completion' ? currentMessage : undefined}
-                  question={promptType === 'question' ? currentQuestion : undefined}
-                  sentiment={currentSentiment}
-                  onDismiss={() => {
-                    setShowPrompt(false);
-                    // If completion was dismissed and user continues typing, reset completion check
-                    if (promptType === 'completion') {
-                      const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
-                      setLastCompletionCheckWordCount(wordCount);
-                    }
-                  }}
-                />
-              )}
-            </div>
-            {/* Tags Input */}
-            <div className="mt-4 space-y-2">
-              <label htmlFor="tags" className="text-sm font-medium text-foreground">
-                Tags (optional)
-              </label>
-              <div className="flex flex-wrap gap-2 items-center">
-                {tags.map((tag) => (
-                  <Badge key={tag} variant="outline" className="flex items-center gap-1">
-                    #{tag}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTag(tag)}
-                      className="ml-1 hover:text-[hsl(var(--color-error))]"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                ))}
-                <Input
-                  id="tags"
-                  type="text"
-                  placeholder="Add tag (press Enter)"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleAddTag}
-                  className="w-auto min-w-[150px] flex-1 max-w-[200px]"
+                >
+                  <Keyboard className="w-4 h-4 mr-2" />
+                  Text
+                </Button>
+                <Button
+                  variant={entryMode === 'voice' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setEntryMode('voice')}
                   disabled={saving}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Press Enter to add a tag. Tags help organize your entries.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-muted-foreground">
-                {wordCount} {wordCount === 1 ? 'word' : 'words'}
-              </p>
-              <div className="flex gap-3">
-                <Link href="/dashboard">
-                  <Button variant="outline" disabled={saving}>
-                    Cancel
-                  </Button>
-                </Link>
-                <Button onClick={handleSave} disabled={!content.trim() || saving}>
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Entry
-                    </>
-                  )}
+                >
+                  <Mic className="w-4 h-4 mr-2" />
+                  Voice
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Editor - Text Mode */}
+        {entryMode === 'text' && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="relative flex gap-4">
+                <div className="flex-1">
+                  <Textarea
+                    value={content}
+                    onChange={(e) => {
+                      setContent(e.target.value);
+                      // If completion message is showing and user continues typing, hide it
+                      if (showPrompt && promptType === 'completion') {
+                        setShowPrompt(false);
+                      }
+                    }}
+                    placeholder="Start writing your thoughts here... Don't worry about perfection, just let your thoughts flow."
+                    className="min-h-[400px] text-base leading-relaxed"
+                    disabled={saving}
+                  />
+                </div>
+                {/* Writing Prompt Bubble */}
+                {showPrompt && (promptType === 'completion' ? currentMessage : currentQuestion) && (
+                  <WritingPromptBubble
+                    type={promptType}
+                    message={promptType === 'completion' ? currentMessage : undefined}
+                    question={promptType === 'question' ? currentQuestion : undefined}
+                    sentiment={currentSentiment}
+                    onDismiss={() => {
+                      setShowPrompt(false);
+                      // If completion was dismissed and user continues typing, reset completion check
+                      if (promptType === 'completion') {
+                        const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
+                        setLastCompletionCheckWordCount(wordCount);
+                      }
+                    }}
+                  />
+                )}
+              </div>
+              {/* Tags Input */}
+              <div className="mt-4 space-y-2">
+                <label htmlFor="tags" className="text-sm font-medium text-foreground">
+                  Tags (optional)
+                </label>
+                <div className="flex flex-wrap gap-2 items-center">
+                  {tags.map((tag) => (
+                    <Badge key={tag} variant="outline" className="flex items-center gap-1">
+                      #{tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="ml-1 hover:text-[hsl(var(--color-error))]"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                  <Input
+                    id="tags"
+                    type="text"
+                    placeholder="Add tag (press Enter)"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleAddTag}
+                    className="w-auto min-w-[150px] flex-1 max-w-[200px]"
+                    disabled={saving}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Press Enter to add a tag. Tags help organize your entries.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-muted-foreground">
+                  {wordCount} {wordCount === 1 ? 'word' : 'words'}
+                </p>
+                <div className="flex gap-3">
+                  <Link href="/dashboard">
+                    <Button variant="outline" disabled={saving}>
+                      Cancel
+                    </Button>
+                  </Link>
+                  <Button onClick={handleSave} disabled={!content.trim() || saving}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Entry
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Voice Mode */}
+        {entryMode === 'voice' && prompt && (
+          <VoiceJournal
+            dailyPrompt={prompt}
+            onEntryCreated={(entry) => {
+              setSavedEntry(entry);
+              // Redirect to dashboard after 2 seconds (same as text entry)
+              setTimeout(() => {
+                router.push('/dashboard');
+                router.refresh();
+              }, 2000);
+            }}
+            onError={(error) => {
+              alert(error);
+            }}
+          />
+        )}
+
+        {/* Cancel button for voice mode */}
+        {entryMode === 'voice' && (
+          <div className="flex justify-end">
+            <Link href="/dashboard">
+              <Button variant="outline" disabled={saving}>
+                Cancel
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
 
     </>

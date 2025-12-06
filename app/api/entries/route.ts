@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { content, prompt, tags } = await request.json();
+    const { content, prompt, tags, fullTranscript, entryType } = await request.json();
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json(
@@ -93,6 +93,8 @@ export async function POST(request: NextRequest) {
         wordCount,
         prompt,
         timeOfDay: getTimeOfDay(),
+        entryType: entryType || 'text', // 'text' or 'voice'
+        fullTranscript: fullTranscript || undefined, // Store full transcript for voice entries
       },
       tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
     });
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
     const user = await UserModel.findById(session.user.id);
     if (user) {
       user.stats.totalEntries += 1;
-      await user.updateStreak();
+      await user.updateStreak(); // This saves the user, so totalEntries will be saved too
     }
 
     return NextResponse.json({ entry }, { status: 201 });

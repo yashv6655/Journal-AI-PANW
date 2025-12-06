@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SentimentBadge } from '@/components/entries/SentimentBadge';
-import { ArrowLeft, Calendar, FileText, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Loader2, Trash2, Mic } from 'lucide-react';
 import { formatDate, formatRelativeTime } from '@/lib/utils';
 
 interface Entry {
@@ -22,6 +22,12 @@ interface Entry {
     wordCount: number;
     prompt?: string;
     timeOfDay: string;
+    entryType?: 'text' | 'voice';
+    fullTranscript?: Array<{
+      role: 'user' | 'assistant' | 'system';
+      content: string;
+      timestamp?: number;
+    }>;
   };
   createdAt: string;
   updatedAt: string;
@@ -189,12 +195,64 @@ export default function EntryDetailPage() {
                   <span className="capitalize">{entry.metadata.timeOfDay}</span>
                 </>
               )}
+              {entry.metadata.entryType === 'voice' && (
+                <>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <Mic className="w-3 h-3" />
+                    Voice Entry
+                  </span>
+                </>
+              )}
             </div>
-            <div className="prose prose-sm max-w-none">
-              <p className="text-base leading-relaxed whitespace-pre-wrap text-foreground">
-                {entry.content}
-              </p>
-            </div>
+            
+            {/* Show full transcript for voice entries */}
+            {entry.metadata.entryType === 'voice' && entry.metadata.fullTranscript && 
+             Array.isArray(entry.metadata.fullTranscript) && 
+             entry.metadata.fullTranscript.length > 0 ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-[hsl(var(--color-muted))]/30 rounded-lg border border-border">
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Full Conversation</h3>
+                  <div className="space-y-3">
+                    {entry.metadata.fullTranscript.map((msg: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-lg ${
+                          msg.role === 'user'
+                            ? 'bg-[hsl(var(--color-primary))]/10 border border-[hsl(var(--color-primary))]/20'
+                            : 'bg-[hsl(var(--color-muted))]/50 border border-border'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-xs font-medium ${
+                            msg.role === 'user'
+                              ? 'text-[hsl(var(--color-primary))]'
+                              : 'text-muted-foreground'
+                          }`}>
+                            {msg.role === 'user' ? 'You' : 'Assistant'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                          {msg.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-4 bg-[hsl(var(--color-muted))]/20 rounded-lg border border-border">
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Your Journal Entry</h3>
+                  <p className="text-base leading-relaxed whitespace-pre-wrap text-foreground">
+                    {entry.content}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="prose prose-sm max-w-none">
+                <p className="text-base leading-relaxed whitespace-pre-wrap text-foreground">
+                  {entry.content}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Original Prompt (if available) */}

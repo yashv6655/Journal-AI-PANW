@@ -30,6 +30,9 @@ export default async function DashboardPage() {
     .limit(5)
     .lean();
 
+  // Sync totalEntries with actual database count
+  const actualEntryCount = await EntryModel.countDocuments({ userId: session.user.id });
+
   // Convert MongoDB documents to plain objects
   const plainEntries = entries.map((entry) => ({
     ...entry,
@@ -39,10 +42,10 @@ export default async function DashboardPage() {
     updatedAt: entry.updatedAt.toISOString(),
   }));
 
-  const stats = user?.stats || {
-    totalEntries: 0,
-    currentStreak: 0,
-    longestStreak: 0,
+  const stats = {
+    totalEntries: actualEntryCount, // Use actual count from database
+    currentStreak: user?.stats?.currentStreak || 0,
+    longestStreak: user?.stats?.longestStreak || 0,
   };
 
   return (
