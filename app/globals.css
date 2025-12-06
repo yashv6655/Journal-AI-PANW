@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme {
+  /* Modern Color Palette - Deep Blues & Warm Accents */
+  --color-primary: 221 83% 53%;
+  --color-primary-dark: 221 83% 45%;
+  --color-primary-light: 221 83% 70%;
+  --color-secondary: 280 67% 58%;
+  --color-accent: 340 75% 55%;
+  
+  /* Neutrals */
+  --color-background: 0 0% 100%;
+  --color-foreground: 222 47% 11%;
+  --color-muted: 210 40% 96%;
+  --color-muted-foreground: 215 16% 47%;
+  --color-border: 214 32% 91%;
+  --color-input: 214 32% 91%;
+  --color-ring: 221 83% 53%;
+  
+  /* Sentiment Colors */
+  --color-positive: 142 71% 45%;
+  --color-neutral: 38 92% 50%;
+  --color-negative: 0 84% 60%;
+  
+  /* Surface & Cards */
+  --color-card: 0 0% 100%;
+  --color-card-foreground: 222 47% 11%;
+  --color-popover: 0 0% 100%;
+  --color-popover-foreground: 222 47% 11%;
+  
+  /* Status */
+  --color-success: 142 71% 45%;
+  --color-warning: 38 92% 50%;
+  --color-error: 0 84% 60%;
+  --color-info: 221 83% 53%;
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--color-border));
+  }
+
+  body {
+    background-color: hsl(var(--color-background));
+    color: hsl(var(--color-foreground));
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .gradient-primary {
+    background: linear-gradient(to right, hsl(var(--color-primary)), hsl(var(--color-primary-dark)));
+  }
+  
+  .gradient-text {
+    background: linear-gradient(to right, hsl(var(--color-primary)), hsl(var(--color-secondary)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  
+  .glass-effect {
+    backdrop-filter: blur(24px);
+    background-color: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .card-hover {
+    transition: all 300ms;
+  }
+  
+  .card-hover:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transform: translateY(-4px);
+  }
+}
