@@ -60,7 +60,6 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
       return;
     }
 
-    // Check for microphone permission
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (error) {
@@ -76,11 +75,8 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
       setTimeRemaining(MAX_CALL_DURATION);
       setCallDuration(0);
       callStartTimeRef.current = Date.now();
-      isProcessingEndRef.current = false; // Reset processing flag for new call
+      isProcessingEndRef.current = false;
 
-      // Create assistant configuration with daily prompt
-      // Note: Simplified configuration - removed function calling for now
-      // We'll rely on silence detection for automatic ending
       const assistantConfig: any = {
         transcriber: {
           provider: 'deepgram',
@@ -126,14 +122,11 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
       
       setCallStatus('active');
       startTimer();
-      lastUserMessageTimeRef.current = Date.now(); // Initialize silence detection
+      lastUserMessageTimeRef.current = Date.now();
 
-      // Set up event listeners
-      // Note: Using type assertion for event names as Vapi SDK types may not be fully defined
       (vapiClient as any).on('message', handleMessage);
-      (vapiClient as any).on('transcript', handleMessage); // Also listen to transcript events
+      (vapiClient as any).on('transcript', handleMessage);
       (vapiClient as any).on('call-end', handleCallEnd);
-      // Removed duplicate 'call-ended' listener to prevent double processing
       (vapiClient as any).on('status-update', handleStatusUpdate);
       (vapiClient as any).on('error', handleError);
     } catch (error: any) {
@@ -151,39 +144,29 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
     }
   };
 
-  // Handle incoming messages
   const handleMessage = (data: any) => {
     try {
-      // Vapi message structure may vary, handle different formats
-      // Could be: { role, content }, { type, text }, { message, role }, etc.
       let message: VapiMessage | null = null;
 
-      // Skip partial/interim transcripts - only process final messages
-      // Vapi sends transcript-partial for incremental updates, transcript-final for complete
       if (data?.type && (
         data.type.includes('partial') ||
         data.type.includes('interim') ||
         data.type.includes('progress')
       )) {
-        return; // Skip incremental updates
+        return;
       }
 
-      // Handle array of messages
       if (Array.isArray(data)) {
         data.forEach((msg) => {
           const parsed = parseMessage(msg);
           if (parsed) {
             setMessages((prev) => {
-              // Check if this is an update to the last message of the same role
               const lastMsg = prev[prev.length - 1];
               if (lastMsg && lastMsg.role === parsed.role) {
-                // If new message starts with or contains last message, it's likely an update
                 if (parsed.content.includes(lastMsg.content) || lastMsg.content.includes(parsed.content)) {
-                  // Replace the last message with the newer, more complete one
                   return [...prev.slice(0, -1), parsed];
                 }
               }
-              // Otherwise add as new message
               return [...prev, parsed];
             });
             // Track user messages for silence detection
@@ -196,27 +179,21 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
         return;
       }
 
-      // Handle single message object
       message = parseMessage(data);
       if (message && message.content) {
         setMessages((prev) => {
-          // Check if this is an incremental update of the last message
           const lastMsg = prev[prev.length - 1];
           if (lastMsg && lastMsg.role === message!.role) {
-            // If exact duplicate, skip
             if (lastMsg.content === message!.content) {
               return prev;
             }
-            // If new message contains or extends the last message, replace it
             if (message!.content.includes(lastMsg.content) || lastMsg.content.includes(message!.content)) {
               return [...prev.slice(0, -1), message!];
             }
           }
-          // Otherwise add as new message
           return [...prev, message!];
         });
 
-        // Track user messages for silence detection
         if (message.role === 'user') {
           lastUserMessageTimeRef.current = Date.now();
           resetSilenceTimer();
@@ -276,7 +253,6 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
     return parsed;
   };
 
-  // Handle call end
   const handleCallEnd = async (data: any) => {
     try {
       // Prevent duplicate processing
@@ -305,7 +281,6 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
         allMessages = [...allMessages, ...newMessages];
       }
 
-      // Also try to get messages from call object if available
       if (vapiRef.current) {
         try {
           // Try different methods to get messages
@@ -334,13 +309,10 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
         }
       }
 
-      // Update state with all collected messages
       setMessages(allMessages);
 
       console.log('handleCallEnd - About to process transcript with', allMessages.length, 'messages');
 
-      // Process transcript with the collected messages (don't wait for state update)
-      // Use a small delay to let any final messages arrive
       setTimeout(() => {
         processTranscript(allMessages);
       }, 1000); // Increased from 500ms to 1000ms to ensure all messages arrive
@@ -352,14 +324,12 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
     }
   };
 
-  // Handle status updates
   const handleStatusUpdate = (data: any) => {
     if (data.status === 'ended' || data.status === 'call-ended') {
       handleCallEnd(data);
     }
   };
 
-  // Handle errors
   const handleError = (error: any) => {
     console.error('Vapi error:', error);
     console.error('Error details:', {

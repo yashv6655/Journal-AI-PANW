@@ -69,13 +69,9 @@ export function EmotionChart() {
     };
 
     fetchChartData();
-    
-    // No automatic refresh - chart updates only when:
-    // 1. Component mounts
-    // 2. Period changes
   }, [period]);
 
-  // Calculate summary statistics - MUST be before any conditional returns (Rules of Hooks)
+
   const summaryStats = useMemo(() => {
     const validScores = chartData
       .filter((point) => point.score !== null && point.hasEntries)
@@ -87,7 +83,6 @@ export function EmotionChart() {
 
     const average = validScores.reduce((a, b) => a + b, 0) / validScores.length;
     const trend = calculateTrend(validScores);
-    // Use individual entry scores for "Most Common Mood" instead of daily averages
     const mostCommon = getMostCommonMood(allEntryScores.length > 0 ? allEntryScores : validScores);
     const daysWithEntries = chartData.filter((p) => p.hasEntries).length;
     const totalDays = chartData.length;
@@ -151,11 +146,9 @@ export function EmotionChart() {
 
   const labelInterval = getLabelInterval();
   const labels = chartData.map((point, index) => {
-    // Parse date string (YYYY-MM-DD) and format it
     const [year, month, day] = point.date.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     
-    // Show label based on interval
     if (index % labelInterval === 0 || index === chartData.length - 1) {
       if (period === '1year') {
         return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
@@ -165,7 +158,6 @@ export function EmotionChart() {
     return '';
   });
 
-  // Get sentiment color based on score
   const getSentimentColor = (score: number | null) => {
     if (score === null) return 'transparent';
     const zone = getMoodZone(score);
@@ -215,7 +207,6 @@ export function EmotionChart() {
         tension: 0.4,
         pointRadius: chartData.map((point) => {
           if (point.hasEntries === false || point.score === null) return 0;
-          // Make positive points slightly larger
           return point.score >= 0.7 ? 6 : 5;
         }),
         pointHoverRadius: chartData.map((point) => 
@@ -230,7 +221,7 @@ export function EmotionChart() {
             : 'hsl(var(--color-primary))'
         ),
         pointBorderWidth: 2,
-        spanGaps: false, // Don't connect points across gaps
+        spanGaps: false,
         borderWidth: 2,
       },
     ],
@@ -294,7 +285,6 @@ export function EmotionChart() {
           maxRotation: 45,
           minRotation: 0,
           callback: function(value: any, index: number): string {
-            // Get label from the labels array using the index
             if (index >= 0 && index < labels.length) {
               return labels[index] || '';
             }
@@ -307,7 +297,6 @@ export function EmotionChart() {
         max: 1,
         grid: {
           color: function(context: any) {
-            // Add reference lines at key thresholds with different colors
             const value = context.tick.value;
             if (value === 0.7 || value === 0.4) {
               return 'hsla(var(--color-border), 0.5)'; // Lighter for reference lines
@@ -329,7 +318,6 @@ export function EmotionChart() {
           },
           stepSize: 0.2,
           callback: function (value: any) {
-            // Show only mood labels at key thresholds
             if (value === 1.0) return 'Very Positive 😊';
             if (value === 0.8) return 'Positive 🙂';
             if (value === 0.6) return 'Neutral 😐';

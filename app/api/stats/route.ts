@@ -26,17 +26,14 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
-    // Get user stats and signup date
     const user = await UserModel.findById(session.user.id).lean();
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Get period from query parameter (default to 'weekly')
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'weekly';
 
-    // Helper function to get UTC date string (YYYY-MM-DD) from a date
     const getUTCDateString = (date: Date): string => {
       const year = date.getUTCFullYear();
       const month = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -51,7 +48,6 @@ export async function GET(request: NextRequest) {
       return normalized;
     };
 
-    // Calculate date range based on period - all in UTC
     const today = normalizeToUTCMidnight(new Date());
 
     const userSignupDate = normalizeToUTCMidnight(new Date(user.createdAt));
@@ -79,7 +75,6 @@ export async function GET(request: NextRequest) {
     }
     startDate.setUTCHours(0, 0, 0, 0);
 
-    // Ensure startDate is not before signup date
     if (userSignupDate > startDate) {
       startDate = new Date(userSignupDate);
     }
@@ -91,14 +86,10 @@ export async function GET(request: NextRequest) {
       .sort({ createdAt: 1 })
       .lean();
 
-    // Group entries by day and calculate average sentiment
     const sentimentByDay: Record<string, { score: number; count: number }> = {};
-
-    // Also collect all individual entry scores for accurate mood statistics
     const allEntryScores: number[] = [];
 
     entries.forEach((entry: { createdAt: Date | string; sentiment?: { score: number } }) => {
-      // Use UTC date string for consistent grouping
       const entryDate = new Date(entry.createdAt);
       const date = getUTCDateString(entryDate);
       if (!sentimentByDay[date]) {
@@ -121,7 +112,6 @@ export async function GET(request: NextRequest) {
     const currentDate = new Date(startDate);
     currentDate.setUTCHours(0, 0, 0, 0);
 
-    // Iterate through all days from startDate to today (both in UTC)
     while (currentDate <= today) {
       const dateString = getUTCDateString(currentDate);
 
@@ -143,14 +133,11 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Move to next day using UTC
       currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
 
-    // Sync totalEntries with actual database count to ensure accuracy
     const actualEntryCount = await EntryModel.countDocuments({ userId: session.user.id });
 
-    // Update user stats if there's a discrepancy (need to fetch non-lean user for saving)
     if (user && user.stats.totalEntries !== actualEntryCount) {
       const userDoc = await UserModel.findById(session.user.id);
       if (userDoc) {
@@ -166,7 +153,7 @@ export async function GET(request: NextRequest) {
         longestStreak: user?.stats?.longestStreak || 0,
       },
       chartData: chartData || [],
-      allEntryScores: allEntryScores || [], // Individual entry scores for accurate statistics
+      allEntryScores: allEntryScores || [],
     });
   } catch (error) {
     console.error('Error fetching stats:', error);

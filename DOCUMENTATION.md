@@ -10,8 +10,9 @@ Full-stack web application for journaling with AI-powered sentiment analysis, wr
 **Backend**: Next.js API Routes, Node.js
 **Database**: MongoDB
 **Authentication**: NextAuth.js
-**AI Services**: OpenAI GPT-4o-mini
+**AI Services**: OpenAI GPT-4o-mini, Vapi
 **Deployment**: Vercel, MongoDB Atlas
+**Tools**: Claude Code, Cursor
 
 ## Design Decisions
 
