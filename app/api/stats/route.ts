@@ -36,31 +36,53 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'weekly';
 
-    // Calculate date range based on period
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Helper function to get UTC date string (YYYY-MM-DD) from a date
+    const getUTCDateString = (date: Date): string => {
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // Normalize date to UTC midnight
+    const normalizeToUTCMidnight = (date: Date): Date => {
+      const normalized = new Date(date);
+      normalized.setUTCHours(0, 0, 0, 0);
+      return normalized;
+    };
+
+    // Calculate date range based on period - all in UTC
+    const today = normalizeToUTCMidnight(new Date());
+
+    const userSignupDate = normalizeToUTCMidnight(new Date(user.createdAt));
 
     let startDate = new Date();
+    startDate.setUTCHours(0, 0, 0, 0);
     switch (period) {
       case 'weekly':
-        startDate.setDate(today.getDate() - 7);
+        startDate.setUTCDate(today.getUTCDate() - 7);
         break;
       case 'monthly':
-        startDate.setMonth(today.getMonth() - 1);
+        startDate.setUTCMonth(today.getUTCMonth() - 1);
         break;
       case '3months':
-        startDate.setMonth(today.getMonth() - 3);
+        startDate.setUTCMonth(today.getUTCMonth() - 3);
         break;
       case '6months':
-        startDate.setMonth(today.getMonth() - 6);
+        startDate.setUTCMonth(today.getUTCMonth() - 6);
         break;
       case '1year':
-        startDate.setFullYear(today.getFullYear() - 1);
+        startDate.setUTCFullYear(today.getUTCFullYear() - 1);
         break;
       default:
-        startDate.setDate(today.getDate() - 7);
+        startDate.setUTCDate(today.getUTCDate() - 7);
     }
-    startDate.setHours(0, 0, 0, 0);
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    // Ensure startDate is not before signup date
+    if (userSignupDate > startDate) {
+      startDate = new Date(userSignupDate);
+    }
 
     const entries = await EntryModel.find({
       userId: session.user.id,
@@ -69,24 +91,16 @@ export async function GET(request: NextRequest) {
       .sort({ createdAt: 1 })
       .lean();
 
-    // Helper function to get local date string (YYYY-MM-DD) from a date
-    const getLocalDateString = (date: Date): string => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-
     // Group entries by day and calculate average sentiment
     const sentimentByDay: Record<string, { score: number; count: number }> = {};
 
     // Also collect all individual entry scores for accurate mood statistics
     const allEntryScores: number[] = [];
 
-    entries.forEach((entry: any) => {
-      // Use local date instead of UTC to avoid timezone issues
+    entries.forEach((entry: { createdAt: Date | string; sentiment?: { score: number } }) => {
+      // Use UTC date string for consistent grouping
       const entryDate = new Date(entry.createdAt);
-      const date = getLocalDateString(entryDate);
+      const date = getUTCDateString(entryDate);
       if (!sentimentByDay[date]) {
         sentimentByDay[date] = { score: 0, count: 0 };
       }
@@ -105,10 +119,11 @@ export async function GET(request: NextRequest) {
       entryCount?: number;
     }> = [];
     const currentDate = new Date(startDate);
+    currentDate.setUTCHours(0, 0, 0, 0);
 
-    // Iterate through all days from startDate to today
+    // Iterate through all days from startDate to today (both in UTC)
     while (currentDate <= today) {
-      const dateString = getLocalDateString(currentDate);
+      const dateString = getUTCDateString(currentDate);
 
       if (sentimentByDay[dateString]) {
         const data = sentimentByDay[dateString];
@@ -128,8 +143,8 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Move to next day
-      currentDate.setDate(currentDate.getDate() + 1);
+      // Move to next day using UTC
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
 
     // Sync totalEntries with actual database count to ensure accuracy
