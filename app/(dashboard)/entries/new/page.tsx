@@ -157,14 +157,16 @@ export default function NewEntryPage() {
     // Only trigger if we've crossed a new threshold
     // Don't show regular prompts if a prompt is already showing (to avoid spamming)
     // Don't show regular prompts if completion message is showing (completion takes priority)
-    if (currentThreshold > lastThreshold && !saving && !showPrompt && promptType !== 'completion') {
+    const currentPromptType = promptType; // Capture value to avoid type narrowing issues in closure
+    if (currentThreshold > lastThreshold && !saving && !showPrompt && currentPromptType !== 'completion') {
       // Debounce to avoid triggering while user is actively typing
       debounceTimerRef.current = setTimeout(() => {
         // Re-check word count after debounce (in case user deleted content)
         const updatedWordCount = content.trim().split(/\s+/).filter(Boolean).length;
         const updatedThreshold = Math.floor(updatedWordCount / WORD_THRESHOLD) * WORD_THRESHOLD;
         
-        if (updatedThreshold > lastThreshold && updatedWordCount >= MIN_WORDS_FOR_PROMPT && !showPrompt && promptType !== 'completion') {
+        // Re-check conditions (state may have changed during debounce)
+        if (updatedThreshold > lastThreshold && updatedWordCount >= MIN_WORDS_FOR_PROMPT && !showPrompt) {
           generateWritingPrompt(content, 'follow-up');
           setLastPromptWordCount(updatedWordCount);
         }
@@ -208,12 +210,14 @@ export default function NewEntryPage() {
 
     // Only trigger if word count >= 15
     // Don't show questions if completion is already showing
-    if (wordCount >= 15 && !saving && promptType !== 'completion') {
+    // Use showPrompt check instead of promptType to avoid type narrowing issues
+    if (wordCount >= 15 && !saving && !showPrompt) {
       // Start 5-second timer - will be reset if user types again
       inactivityTimerRef.current = setTimeout(() => {
         // Re-check conditions after timeout
         const updatedWordCount = content.trim().split(/\s+/).filter(Boolean).length;
-        if (updatedWordCount >= 15 && !saving && !isGeneratingPrompt && promptType !== 'completion') {
+        // Check showPrompt state (which includes completion check) instead of promptType
+        if (updatedWordCount >= 15 && !saving && !isGeneratingPrompt && !showPrompt) {
           generateWritingPrompt(content, 'follow-up');
         }
       }, 5000); // 5 seconds of inactivity

@@ -266,11 +266,11 @@ export function EmotionChart() {
         displayColors: false,
         titleFont: {
           color: 'hsl(222, 47%, 11%)',
-          weight: '600' as const,
-        },
+          weight: 'bold' as const,
+        } as any,
         bodyFont: {
           color: 'hsl(222, 47%, 11%)',
-        },
+        } as any,
         callbacks: {
           title: function (items: any[]) {
             if (items.length === 0) return '';
@@ -306,9 +306,12 @@ export function EmotionChart() {
           },
           maxRotation: 45,
           minRotation: 0,
-          callback: function(value: any, index: number) {
-            const label = this.getLabelForValue(value);
-            return label || '';
+          callback: function(value: any, index: number): string {
+            // Get label from the labels array using the index
+            if (index >= 0 && index < labels.length) {
+              return labels[index] || '';
+            }
+            return '';
           },
         },
       },

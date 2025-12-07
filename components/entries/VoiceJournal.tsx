@@ -300,8 +300,8 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
           .filter((m: VapiMessage | null): m is VapiMessage => m !== null);
         
         // Merge avoiding duplicates
-        const existingContents = new Set(allMessages.map((m) => m.content));
-        const newMessages = parsedMessages.filter(m => !existingContents.has(m.content));
+        const existingContents = new Set(allMessages.map((m: VapiMessage) => m.content));
+        const newMessages = parsedMessages.filter((m: VapiMessage) => !existingContents.has(m.content));
         allMessages = [...allMessages, ...newMessages];
       }
 
