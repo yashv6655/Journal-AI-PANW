@@ -67,5 +67,5 @@ AI analysis results (themes, correlations, topics) cached in MongoDB and invalid
 - More visualizations
 - More Personable Messages and Prompts
 - Less reliability on OpenAI
-- Reminder eMails regarding streak loss or Reminder to Come Back to Platform for User Retention
-- Enable metrics for the website, PostHog or Vercel to See User Interactions
+- Reminder emails regarding streak loss or reminder to come back to platform for user retention
+- Enable metrics for the website, PostHog or Vercel to see user interactions
