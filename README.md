@@ -4,9 +4,7 @@ AI-powered journaling companion with sentiment analysis, writing prompts, and em
 
 ## Presentation Video
 
-[Link to your 5-7 minute presentation video (YouTube/Vimeo)]
-
-Upload your presentation video to YouTube or Vimeo and add the link above. The video should cover the problem, solution, live demo, and key learnings.
+<https://www.youtube.com/watch?v=BYN0yTe9zlI>
 
 ## Features
 
@@ -49,7 +47,6 @@ Upload your presentation video to YouTube or Vimeo and add the link above. The v
    NEXTAUTH_URL=http://localhost:3000
    OPENAI_API_KEY=<your-openai-api-key>
    NEXT_PUBLIC_VAPI_PUBLIC_KEY=<your-vapi-public-key>
-   VAPI_PRIVATE_KEY=<your-vapi-private-key>
    ```
 
 3. Run development server:
