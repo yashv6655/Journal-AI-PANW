@@ -22,11 +22,6 @@ const SILENCE_TIMEOUT = 8; // 8 seconds of silence before auto-ending (as backup
 
 export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJournalProps) {
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
-  
-  // Keep ref in sync with state for use in timers
-  useEffect(() => {
-    callStatusRef.current = callStatus;
-  }, [callStatus]);
   const [messages, setMessages] = useState<VapiMessage[]>([]);
   const [timeRemaining, setTimeRemaining] = useState<number>(MAX_CALL_DURATION);
   const [callDuration, setCallDuration] = useState<number>(0);
@@ -36,6 +31,17 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
   const lastUserMessageTimeRef = useRef<number>(0);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const callStatusRef = useRef<CallStatus>('idle');
+  const messagesRef = useRef<VapiMessage[]>([]); // Keep messages in ref to avoid state race conditions
+  const isProcessingEndRef = useRef<boolean>(false); // Prevent duplicate call-end processing
+
+  // Keep refs in sync with state for use in timers and async operations
+  useEffect(() => {
+    callStatusRef.current = callStatus;
+  }, [callStatus]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Format time in MM:SS format
   const formatTime = (ms: number): string => {
@@ -70,6 +76,7 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
       setTimeRemaining(MAX_CALL_DURATION);
       setCallDuration(0);
       callStartTimeRef.current = Date.now();
+      isProcessingEndRef.current = false; // Reset processing flag for new call
 
       // Create assistant configuration with daily prompt
       // Note: Simplified configuration - removed function calling for now
@@ -126,7 +133,7 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
       (vapiClient as any).on('message', handleMessage);
       (vapiClient as any).on('transcript', handleMessage); // Also listen to transcript events
       (vapiClient as any).on('call-end', handleCallEnd);
-      (vapiClient as any).on('call-ended', handleCallEnd); // Alternative event name
+      // Removed duplicate 'call-ended' listener to prevent double processing
       (vapiClient as any).on('status-update', handleStatusUpdate);
       (vapiClient as any).on('error', handleError);
     } catch (error: any) {
@@ -242,11 +249,19 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
   // Handle call end
   const handleCallEnd = async (data: any) => {
     try {
+      // Prevent duplicate processing
+      if (isProcessingEndRef.current) {
+        console.log('handleCallEnd already in progress, skipping duplicate call');
+        return;
+      }
+      isProcessingEndRef.current = true;
+
       setCallStatus('ending');
       stopTimer();
 
-      // Collect all messages from different sources
-      let allMessages: VapiMessage[] = [...messages];
+      // Collect all messages from different sources (use ref to get latest messages)
+      let allMessages: VapiMessage[] = [...messagesRef.current];
+      console.log('handleCallEnd - Current messages from ref:', allMessages.length, 'messages');
 
       // Get final messages if available from webhook data
       if (data?.messages && Array.isArray(data.messages)) {
@@ -292,10 +307,13 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
       // Update state with all collected messages
       setMessages(allMessages);
 
+      console.log('handleCallEnd - About to process transcript with', allMessages.length, 'messages');
+
       // Process transcript with the collected messages (don't wait for state update)
+      // Use a small delay to let any final messages arrive
       setTimeout(() => {
         processTranscript(allMessages);
-      }, 500);
+      }, 1000); // Increased from 500ms to 1000ms to ensure all messages arrive
     } catch (error: any) {
       console.error('Error handling call end:', error);
       setCallStatus('error');
@@ -314,9 +332,26 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
   // Handle errors
   const handleError = (error: any) => {
     console.error('Vapi error:', error);
+    console.error('Error details:', {
+      type: error?.type,
+      error: error?.error,
+      message: error?.error?.msg || error?.message,
+      timestamp: error?.timestamp,
+    });
+
+    // Don't set error status if call is already ending/processing
+    // This prevents the error from interrupting transcript processing
+    if (callStatusRef.current === 'ending' || callStatusRef.current === 'processing') {
+      console.log('Ignoring error during call end/processing phase');
+      return;
+    }
+
     setCallStatus('error');
     stopTimer();
-    onError?.('An error occurred during the call. Please try again.');
+
+    // Provide more specific error message
+    const errorMsg = error?.error?.msg || error?.message || 'An error occurred during the call. Please try again.';
+    onError?.(errorMsg);
   };
 
   // Process transcript and create entry
@@ -387,67 +422,42 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
       if (result.success && result.entry) {
         setCallStatus('completed');
         onEntryCreated?.(result.entry);
+        // Reset processing flag after successful completion
+        setTimeout(() => {
+          isProcessingEndRef.current = false;
+        }, 2000);
       } else {
         // Only show error if save actually failed
         // Don't show error if entry was saved but we got a false negative
         setCallStatus('error');
         onError?.(result.error || 'Failed to save entry. Please try again.');
+        isProcessingEndRef.current = false; // Reset on error
       }
     } catch (error: any) {
       console.error('Error processing transcript:', error);
       setCallStatus('error');
       const errorMsg = error?.message || 'Error processing your journal entry. Please try again.';
       onError?.(errorMsg);
+      isProcessingEndRef.current = false; // Reset on error
     }
   };
 
-  // End call manually
+  // End call manually - Just stop the call, let handleCallEnd event process the transcript
   const endCall = async () => {
     try {
-      stopTimer();
-      setCallStatus('ending');
-      
-      // Collect current messages before stopping
-      let allMessages: VapiMessage[] = [...messages];
-      
+      // Just stop the Vapi call - the 'call-end' event will trigger handleCallEnd
       if (vapiRef.current && vapiClient) {
-        try {
-          // Try to get final messages before stopping
-          if (typeof vapiRef.current.getMessages === 'function') {
-            try {
-              const callMessages = await vapiRef.current.getMessages();
-              if (callMessages && Array.isArray(callMessages)) {
-                const parsedMessages = callMessages
-                  .map((m: any) => parseMessage(m))
-                  .filter((m: VapiMessage | null): m is VapiMessage => m !== null);
-                
-                const existingContents = new Set(allMessages.map((m) => m.content));
-                const newMessages = parsedMessages.filter(m => !existingContents.has(m.content));
-                allMessages = [...allMessages, ...newMessages];
-              }
-            } catch (err) {
-              console.warn('Could not get messages before stopping:', err);
-            }
-          }
-          
-          await vapiClient.stop();
-        } catch (stopError) {
-          console.error('Error stopping call:', stopError);
-          // Continue processing even if stop fails
-        }
+        console.log('Stopping Vapi call...');
+        await vapiClient.stop();
+        // handleCallEnd will be triggered by the call-end event from Vapi
       }
-      
-      // Update state
-      setMessages(allMessages);
-      
-      // Process transcript with collected messages
-      setTimeout(() => {
-        processTranscript(allMessages);
-      }, 500);
     } catch (error) {
-      console.error('Error ending call:', error);
-      setCallStatus('error');
-      onError?.('Error ending call. Please try again.');
+      console.error('Error stopping call:', error);
+      // Fallback: if stop fails and we haven't started processing yet, try to process manually
+      if (!isProcessingEndRef.current) {
+        console.log('Stop failed, processing manually as fallback');
+        handleCallEnd({});
+      }
     }
   };
 
@@ -490,22 +500,24 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
       silenceTimerRef.current = null;
     }
 
+    // DISABLED: Silence detection auto-end removed per user request
+    // Call will only end when user clicks "End Call" button or max duration reached
     // Only start silence detection if call is active
-    if (callStatusRef.current === 'active') {
-      const elapsed = Date.now() - callStartTimeRef.current;
-      // Only enable silence detection after minimum duration and if user has spoken
-      if (elapsed >= MIN_CALL_DURATION && lastUserMessageTimeRef.current > callStartTimeRef.current) {
-        // Set timer to check for silence after SILENCE_TIMEOUT seconds
-        silenceTimerRef.current = setTimeout(() => {
-          const timeSinceLastUserMessage = Date.now() - lastUserMessageTimeRef.current;
-          // If no user message in the last SILENCE_TIMEOUT seconds, end the call
-          if (timeSinceLastUserMessage >= SILENCE_TIMEOUT * 1000 && callStatusRef.current === 'active') {
-            console.log('Silence detected after user speech, ending call automatically');
-            endCall();
-          }
-        }, SILENCE_TIMEOUT * 1000);
-      }
-    }
+    // if (callStatusRef.current === 'active') {
+    //   const elapsed = Date.now() - callStartTimeRef.current;
+    //   // Only enable silence detection after minimum duration and if user has spoken
+    //   if (elapsed >= MIN_CALL_DURATION && lastUserMessageTimeRef.current > callStartTimeRef.current) {
+    //     // Set timer to check for silence after SILENCE_TIMEOUT seconds
+    //     silenceTimerRef.current = setTimeout(() => {
+    //       const timeSinceLastUserMessage = Date.now() - lastUserMessageTimeRef.current;
+    //       // If no user message in the last SILENCE_TIMEOUT seconds, end the call
+    //       if (timeSinceLastUserMessage >= SILENCE_TIMEOUT * 1000 && callStatusRef.current === 'active') {
+    //         console.log('Silence detected after user speech, ending call automatically');
+    //         endCall();
+    //       }
+    //     }, SILENCE_TIMEOUT * 1000);
+    //   }
+    // }
   };
 
   // Cleanup on unmount
@@ -516,7 +528,7 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
         (vapiClient as any).off('message', handleMessage);
         (vapiClient as any).off('transcript', handleMessage);
         (vapiClient as any).off('call-end', handleCallEnd);
-        (vapiClient as any).off('call-ended', handleCallEnd);
+        // Removed duplicate 'call-ended' cleanup
         (vapiClient as any).off('status-update', handleStatusUpdate);
         (vapiClient as any).off('error', handleError);
         if (vapiRef.current) {

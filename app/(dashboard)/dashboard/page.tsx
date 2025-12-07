@@ -9,6 +9,8 @@ import { StatsGrid } from '@/components/dashboard/StatsGrid';
 import { EntryList } from '@/components/dashboard/EntryList';
 import { EmotionChart } from '@/components/dashboard/EmotionChart';
 import { ThemeInsights } from '@/components/dashboard/ThemeInsights';
+import { GoalSelector } from '@/components/dashboard/GoalSelector';
+import { CorrelationInsights } from '@/components/dashboard/CorrelationInsights';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp } from 'lucide-react';
 
@@ -85,8 +87,14 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Goal Selector */}
+      <GoalSelector />
+
       {/* Theme Insights */}
       <ThemeInsights />
+
+      {/* Correlation Insights */}
+      <CorrelationInsights />
 
       {/* Recent Entries */}
       <div>

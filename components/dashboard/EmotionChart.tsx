@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,6 +13,18 @@ import {
   Filler,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import { 
+  getMoodZone, 
+  getMoodEmoji, 
+  getMoodLabel, 
+  formatScore, 
+  formatTooltipDate,
+  calculateTrend,
+  getMostCommonMood,
+  MOOD_ZONES,
+} from '@/lib/chartUtils';
+import { Card, CardContent } from '@/components/ui/card';
+import { TrendingUp, TrendingDown, Minus, Smile, Frown, Meh, Info } from 'lucide-react';
 
 ChartJS.register(
   CategoryScale,
@@ -29,6 +41,7 @@ interface ChartDataPoint {
   date: string;
   score: number | null;
   hasEntries?: boolean;
+  entryCount?: number;
 }
 
 type TimePeriod = 'weekly' | 'monthly' | '3months' | '6months' | '1year';
@@ -73,6 +86,31 @@ export function EmotionChart() {
     };
   }, [period]);
 
+  // Calculate summary statistics - MUST be before any conditional returns (Rules of Hooks)
+  const summaryStats = useMemo(() => {
+    const validScores = chartData
+      .filter((point) => point.score !== null && point.hasEntries)
+      .map((point) => point.score!);
+    
+    if (validScores.length === 0) {
+      return null;
+    }
+
+    const average = validScores.reduce((a, b) => a + b, 0) / validScores.length;
+    const trend = calculateTrend(validScores);
+    const mostCommon = getMostCommonMood(validScores);
+    const daysWithEntries = chartData.filter((p) => p.hasEntries).length;
+    const totalDays = chartData.length;
+
+    return {
+      average,
+      trend,
+      mostCommon,
+      daysWithEntries,
+      totalDays,
+    };
+  }, [chartData]);
+
   if (loading) {
     return (
       <div className="h-64 flex items-center justify-center">
@@ -83,12 +121,18 @@ export function EmotionChart() {
 
   if (chartData.length === 0) {
     return (
-      <div className="h-64 flex items-center justify-center bg-gradient-to-br from-[hsl(var(--color-muted))] to-background rounded-xl border-2 border-dashed border-border">
-        <div className="text-center">
-          <div className="text-6xl mb-4">📊</div>
-          <p className="text-muted-foreground px-4">
-            Chart will appear here after you create more entries
-          </p>
+      <div className="space-y-4">
+        <div className="h-64 flex items-center justify-center bg-gradient-to-br from-[hsl(var(--color-muted))] to-background rounded-xl border-2 border-dashed border-border">
+          <div className="text-center max-w-md px-4">
+            <div className="text-5xl mb-4">📊</div>
+            <h3 className="text-lg font-semibold text-foreground mb-2">Your Emotional Journey</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Track how your mood changes day by day. Higher scores indicate more positive emotions.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Create a few journal entries to see your emotional trends visualized here.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -129,10 +173,10 @@ export function EmotionChart() {
   });
 
   // Get sentiment color based on score
-  const getSentimentColor = (score: number) => {
-    if (score >= 0.7) return 'hsl(var(--color-positive))';
-    if (score >= 0.4) return 'hsl(var(--color-muted))';
-    return 'hsl(var(--color-negative))';
+  const getSentimentColor = (score: number | null) => {
+    if (score === null) return 'transparent';
+    const zone = getMoodZone(score);
+    return zone?.color || 'hsl(var(--color-muted))';
   };
 
   const data = {
@@ -148,24 +192,44 @@ export function EmotionChart() {
           if (!chartArea) {
             return 'transparent';
           }
-          // Create subtle gradient fill (light blue to transparent)
+          
+          // Create gradient with color zones
           const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          gradient.addColorStop(0, 'hsla(221, 83%, 53%, 0.15)'); // Light blue at top
-          gradient.addColorStop(1, 'hsla(221, 83%, 53%, 0.02)'); // Almost transparent at bottom
+          const height = chartArea.bottom - chartArea.top;
+          
+          // Very Positive zone (0.85-1.0) - Green
+          const veryPositiveStart = chartArea.top + (height * (1 - 0.85));
+          const veryPositiveEnd = chartArea.top + (height * (1 - 0.7));
+          gradient.addColorStop(0, 'hsla(142, 71%, 45%, 0.08)'); // Green
+          gradient.addColorStop((veryPositiveStart - chartArea.top) / height, 'hsla(142, 71%, 45%, 0.08)');
+          
+          // Positive zone (0.7-0.85) - Light Green
+          gradient.addColorStop((veryPositiveEnd - chartArea.top) / height, 'hsla(142, 71%, 45%, 0.05)');
+          
+          // Neutral zone (0.4-0.7) - Gray/Yellow
+          const neutralStart = chartArea.top + (height * (1 - 0.7));
+          const neutralEnd = chartArea.top + (height * (1 - 0.4));
+          gradient.addColorStop((neutralStart - chartArea.top) / height, 'hsla(45, 93%, 47%, 0.03)'); // Yellow
+          gradient.addColorStop((neutralEnd - chartArea.top) / height, 'hsla(45, 93%, 47%, 0.03)');
+          
+          // Negative zones (0-0.4) - Red
+          gradient.addColorStop((neutralEnd - chartArea.top) / height, 'hsla(0, 84%, 60%, 0.05)'); // Red
+          gradient.addColorStop(1, 'hsla(0, 84%, 60%, 0.08)');
+          
           return gradient;
         },
         fill: true,
         tension: 0.4,
-        pointRadius: chartData.map((point) => 
-          point.hasEntries === false || point.score === null ? 0 : 5
-        ),
+        pointRadius: chartData.map((point) => {
+          if (point.hasEntries === false || point.score === null) return 0;
+          // Make positive points slightly larger
+          return point.score >= 0.7 ? 6 : 5;
+        }),
         pointHoverRadius: chartData.map((point) => 
-          point.hasEntries === false || point.score === null ? 0 : 7
+          point.hasEntries === false || point.score === null ? 0 : 8
         ),
         pointBackgroundColor: chartData.map((point) => 
-          point.hasEntries === false || point.score === null
-            ? 'transparent' 
-            : getSentimentColor(point.score)
+          getSentimentColor(point.score)
         ),
         pointBorderColor: chartData.map((point) => 
           point.hasEntries === false || point.score === null
@@ -202,10 +266,24 @@ export function EmotionChart() {
           color: 'hsl(222, 47%, 11%)',
         },
         callbacks: {
+          title: function (items: any[]) {
+            if (items.length === 0) return '';
+            const index = items[0].dataIndex;
+            const point = chartData[index];
+            return formatTooltipDate(point.date);
+          },
           label: function (context: any) {
             const score = context.parsed.y;
-            const sentiment = score >= 0.7 ? 'Positive' : score >= 0.4 ? 'Neutral' : 'Negative';
-            return `Sentiment: ${sentiment} (${(score * 100).toFixed(0)}%)`;
+            if (score === null) return 'No entries';
+            
+            const zone = getMoodZone(score);
+            const emoji = zone?.emoji || '😐';
+            const label = zone?.label || 'Unknown';
+            const index = context.dataIndex;
+            const point = chartData[index];
+            const entryCount = point.entryCount || 0;
+            
+            return `${label} ${emoji} • ${formatScore(score)}${entryCount > 0 ? ` • ${entryCount} ${entryCount === 1 ? 'entry' : 'entries'}` : ''}`;
           },
         },
       },
@@ -232,14 +310,36 @@ export function EmotionChart() {
         min: 0,
         max: 1,
         grid: {
-          color: 'hsl(var(--color-border))',
+          color: function(context: any) {
+            // Add reference lines at key thresholds with different colors
+            const value = context.tick.value;
+            if (value === 0.7 || value === 0.4) {
+              return 'hsla(var(--color-border), 0.5)'; // Lighter for reference lines
+            }
+            return 'hsl(var(--color-border))';
+          },
+          lineWidth: function(context: any) {
+            const value = context.tick.value;
+            if (value === 0.7 || value === 0.4) {
+              return 1.5; // Thicker reference lines
+            }
+            return 1;
+          },
         },
         ticks: {
           color: 'hsl(var(--color-muted-foreground))',
           font: {
-            size: 12,
+            size: 11,
           },
+          stepSize: 0.1,
           callback: function (value: any) {
+            // Show zone labels at key thresholds
+            if (value === 0.85) return 'Very Positive 😊';
+            if (value === 0.7) return 'Positive 🙂';
+            if (value === 0.4) return 'Neutral 😐';
+            if (value === 0.3) return 'Negative 😟';
+            if (value === 0) return 'Very Negative 😔';
+            // For other values, show percentage
             return `${(value * 100).toFixed(0)}%`;
           },
         },
@@ -257,6 +357,117 @@ export function EmotionChart() {
 
   return (
     <div className="space-y-4">
+      {/* Chart Title and Description */}
+      <div>
+        <h3 className="text-lg font-semibold text-foreground mb-1">Your Emotional Journey Over Time</h3>
+        <p className="text-sm text-muted-foreground">
+          Track how your mood changes day by day. Higher scores indicate more positive emotions.
+        </p>
+      </div>
+
+      {/* Summary Statistics */}
+      {summaryStats && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Average Mood</p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {getMoodLabel(summaryStats.average)} {getMoodEmoji(summaryStats.average)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatScore(summaryStats.average)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Trend</p>
+                  <div className="flex items-center gap-2">
+                    {summaryStats.trend.direction === 'improving' && (
+                      <>
+                        <TrendingUp className="w-4 h-4 text-[hsl(var(--color-positive))]" />
+                        <p className="text-lg font-semibold text-[hsl(var(--color-positive))]">
+                          Improving
+                        </p>
+                      </>
+                    )}
+                    {summaryStats.trend.direction === 'declining' && (
+                      <>
+                        <TrendingDown className="w-4 h-4 text-[hsl(var(--color-negative))]" />
+                        <p className="text-lg font-semibold text-[hsl(var(--color-negative))]">
+                          Declining
+                        </p>
+                      </>
+                    )}
+                    {summaryStats.trend.direction === 'stable' && (
+                      <>
+                        <Minus className="w-4 h-4 text-muted-foreground" />
+                        <p className="text-lg font-semibold text-muted-foreground">
+                          Stable
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {summaryStats.trend.percentage.toFixed(1)}% change
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Most Common</p>
+                  <div className="flex items-center gap-2">
+                    {summaryStats.mostCommon.mood === 'positive' && (
+                      <Smile className="w-4 h-4 text-[hsl(var(--color-positive))]" />
+                    )}
+                    {summaryStats.mostCommon.mood === 'neutral' && (
+                      <Meh className="w-4 h-4 text-muted-foreground" />
+                    )}
+                    {summaryStats.mostCommon.mood === 'negative' && (
+                      <Frown className="w-4 h-4 text-[hsl(var(--color-negative))]" />
+                    )}
+                    <p className="text-lg font-semibold text-foreground capitalize">
+                      {summaryStats.mostCommon.mood}
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {summaryStats.mostCommon.percentage.toFixed(0)}% of entries
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Activity</p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {summaryStats.daysWithEntries} / {summaryStats.totalDays}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    days with entries
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Period Selector */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">Time Period</h3>
@@ -276,9 +487,34 @@ export function EmotionChart() {
           ))}
         </div>
       </div>
+
+      {/* Color Zone Legend */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4 text-xs">
+          <span className="text-muted-foreground font-medium">Mood Zones:</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-[hsl(var(--color-negative))] opacity-60"></div>
+              <span className="text-muted-foreground">Negative (0-40%)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-gray-400 opacity-60"></div>
+              <span className="text-muted-foreground">Neutral (40-70%)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-[hsl(var(--color-positive))] opacity-60"></div>
+              <span className="text-muted-foreground">Positive (70-100%)</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Info className="w-3 h-3" />
+          <span>Hover over points to see details</span>
+        </div>
+      </div>
       
       {/* Chart */}
-      <div className="h-64 w-full">
+      <div className="h-64 w-full relative">
         <Line data={data} options={options} />
       </div>
     </div>

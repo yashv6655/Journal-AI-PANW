@@ -136,6 +136,23 @@ export async function POST(request: NextRequest) {
       await user.updateStreak(); // This saves the user, so totalEntries will be saved too
     }
 
+    // Invalidate analysis caches - will be regenerated on next request
+    // We don't regenerate here to avoid blocking the entry creation response
+    try {
+      const ThemeAnalysisModel = (await import('@/models/ThemeAnalysis')).default;
+      const CorrelationAnalysisModel = (await import('@/models/CorrelationAnalysis')).default;
+      const TopicAnalysisModel = (await import('@/models/TopicAnalysis')).default;
+      
+      await Promise.all([
+        ThemeAnalysisModel.deleteOne({ userId: session.user.id }),
+        CorrelationAnalysisModel.deleteOne({ userId: session.user.id }),
+        TopicAnalysisModel.deleteOne({ userId: session.user.id }),
+      ]);
+    } catch (error) {
+      // Non-critical, just log
+      console.warn('Failed to invalidate analysis caches:', error);
+    }
+
     return NextResponse.json({ entry }, { status: 201 });
   } catch (error) {
     console.error('Error creating entry:', error);

@@ -1,6 +1,7 @@
 import { openai, JOURNALING_SYSTEM_PROMPT } from '@/lib/openai';
 import EntryModel from '@/models/Entry';
 import DailyPromptModel from '@/models/DailyPrompt';
+import UserModel from '@/models/User';
 import { connectDB } from '@/lib/db';
 import type { PromptResponse } from '@/types';
 
@@ -105,6 +106,10 @@ async function generateNewDailyPrompt(
 
     const today = getTodayDateString();
 
+    // Fetch user to get journaling goal
+    const user = await UserModel.findById(userId).lean();
+    const journalingGoal = user?.preferences?.journalingGoal;
+
     // Fetch last 3 entries for context
     const recentEntries = await EntryModel.find({ userId })
       .sort({ createdAt: -1 })
@@ -114,12 +119,49 @@ async function generateNewDailyPrompt(
     let prompt: string;
     let context: string | null = null;
 
-    // If no entries, use fallback prompt
+    // If no entries, use fallback prompt (but still consider goal)
     if (recentEntries.length === 0) {
-      prompt =
-        FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)];
+      if (journalingGoal) {
+        // Generate goal-based prompt even without entries
+        const goalDescriptions: { [key: string]: string } = {
+          stress_relief: 'The user wants to use journaling for stress relief and managing anxiety.',
+          self_discovery: 'The user wants to use journaling for self-discovery and understanding themselves better.',
+          habit_building: 'The user wants to use journaling to build consistent habits and track progress.',
+        };
+
+        const aiPrompt = `Generate ONE thoughtful, open-ended question to help the user start their journaling journey. 
+
+User's journaling goal: ${goalDescriptions[journalingGoal] || journalingGoal}
+
+The question should:
+- Be empathetic and warm
+- Align with their goal of ${journalingGoal.replace('_', ' ')}
+- Encourage deeper self-reflection
+- Be concise (1-2 sentences max)
+- Help them begin their journaling practice
+
+Return only the question, nothing else.`;
+
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: JOURNALING_SYSTEM_PROMPT },
+            { role: 'user', content: aiPrompt },
+          ],
+          temperature: 0.8,
+          max_tokens: 100,
+        });
+
+        prompt = response.choices[0].message.content?.trim() || '';
+        if (!prompt) {
+          prompt = FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)];
+        }
+        context = 'Based on your journaling goals';
+      } else {
+        prompt = FALLBACK_PROMPTS[Math.floor(Math.random() * FALLBACK_PROMPTS.length)];
+      }
     } else {
-      // Generate contextual prompt
+      // Generate contextual prompt with both entries and goals
       const entrySummaries = recentEntries.map((entry, i) => {
         const sentiment = entry.sentiment?.overall || 'unknown';
         const emotions = entry.sentiment?.emotions?.join(', ') || 'none';
@@ -129,13 +171,23 @@ async function generateNewDailyPrompt(
 
       const contextSummary = entrySummaries.join('\n\n');
 
+      const goalDescriptions: { [key: string]: string } = {
+        stress_relief: 'The user wants to use journaling for stress relief. If entries mention stress, anxiety, or overwhelm, focus prompts on coping strategies, moments of calm, or self-care.',
+        self_discovery: 'The user wants to use journaling for self-discovery. Focus prompts on understanding patterns, exploring identity, or reflecting on personal growth.',
+        habit_building: 'The user wants to use journaling to build consistent habits. Focus prompts on progress, routines, or what helps them stay consistent.',
+      };
+
+      const goalContext = journalingGoal 
+        ? `\n\nUser's journaling goal: ${goalDescriptions[journalingGoal] || journalingGoal}\nWhen generating the prompt, consider both their recent entries AND their stated goal.`
+        : '';
+
       const aiPrompt = `Based on these recent journal entries:
 
-${contextSummary}
+${contextSummary}${goalContext}
 
 Generate ONE thoughtful, open-ended question to help the user reflect today. The question should:
 - Be empathetic and warm
-- Build on themes from their recent entries
+- Build on themes from their recent entries${journalingGoal ? ' while aligning with their journaling goal' : ''}
 - Encourage deeper self-reflection
 - Be concise (1-2 sentences max)
 - Not repeat previous questions
@@ -156,7 +208,9 @@ Return only the question, nothing else.`;
       if (!prompt) {
         throw new Error('Empty prompt from OpenAI');
       }
-      context = 'Based on your recent reflections';
+      context = journalingGoal 
+        ? 'Based on your recent reflections and journaling goals'
+        : 'Based on your recent reflections';
     }
 
     // Save daily prompt

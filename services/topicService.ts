@@ -1,5 +1,6 @@
 import { openai, JOURNALING_SYSTEM_PROMPT } from '@/lib/openai';
 import EntryModel from '@/models/Entry';
+import TopicAnalysisModel from '@/models/TopicAnalysis';
 import { connectDB } from '@/lib/db';
 
 export interface Topic {
@@ -105,9 +106,24 @@ const CURATED_TOPICS: Topic[] = [
   },
 ];
 
-export async function generateDynamicTopics(userId: string): Promise<Topic[]> {
+export async function generateDynamicTopics(
+  userId: string,
+  forceRefresh: boolean = false
+): Promise<Topic[]> {
   try {
     await connectDB();
+
+    // Check cache first (unless force refresh)
+    // Cache is automatically invalidated when new entries are created,
+    // so we can trust it if it exists without querying the database
+    if (!forceRefresh) {
+      const cached = await TopicAnalysisModel.findOne({ userId }).lean();
+      if (cached && cached.topics && cached.topics.length > 0) {
+        // Cache exists and is valid - return it immediately
+        // No need to check database - cache is invalidated on new entry creation
+        return cached.topics as Topic[];
+      }
+    }
 
     // Fetch last 15 entries for analysis
     const recentEntries = await EntryModel.find({ userId })
@@ -116,8 +132,20 @@ export async function generateDynamicTopics(userId: string): Promise<Topic[]> {
       .lean();
 
     // Always include curated topics
-    // If user has fewer than 5 entries, return only curated topics
+    // If user has fewer than 5 entries, return only curated topics (but still cache them)
     if (recentEntries.length < 5) {
+      // Cache curated topics so we don't process them every time
+      await TopicAnalysisModel.findOneAndUpdate(
+        { userId },
+        {
+          userId,
+          topics: CURATED_TOPICS,
+          lastEntryId: undefined,
+          lastEntryDate: new Date(),
+          updatedAt: new Date(),
+        },
+        { upsert: true, new: true }
+      );
       return CURATED_TOPICS;
     }
 
@@ -209,14 +237,60 @@ Be specific and personal - avoid generic topics.`;
         }
       });
 
+      // Get the latest entry info for cache
+      const latestEntry = recentEntries.length > 0 ? recentEntries[0] : null;
+      const latestEntryId = latestEntry?._id?.toString();
+      const latestEntryDate = latestEntry?.createdAt
+        ? new Date(latestEntry.createdAt)
+        : new Date();
+
+      // Save to cache
+      await TopicAnalysisModel.findOneAndUpdate(
+        { userId },
+        {
+          userId,
+          topics: allTopics,
+          lastEntryId: latestEntryId || undefined,
+          lastEntryDate: latestEntryDate,
+          updatedAt: new Date(),
+        },
+        { upsert: true, new: true }
+      );
+
       return allTopics;
     }
 
-    // Fallback to curated topics if dynamic generation failed
+    // If no valid topics generated, fall back to curated topics and cache them
+    const latestEntry = recentEntries.length > 0 ? recentEntries[0] : null;
+    const latestEntryId = latestEntry?._id?.toString();
+    const latestEntryDate = latestEntry?.createdAt
+      ? new Date(latestEntry.createdAt)
+      : new Date();
+
+    // Save curated topics to cache
+    await TopicAnalysisModel.findOneAndUpdate(
+      { userId },
+      {
+        userId,
+        topics: CURATED_TOPICS,
+        lastEntryId: latestEntryId || undefined,
+        lastEntryDate: latestEntryDate,
+        updatedAt: new Date(),
+      },
+      { upsert: true, new: true }
+    );
+
     return CURATED_TOPICS;
-  } catch (error) {
-    console.error('Error generating dynamic topics:', error);
-    // Return curated topics on error
-    return CURATED_TOPICS;
+    } catch (error) {
+      console.error('Error generating dynamic topics:', error);
+      
+      // Try to return cached topics on error
+      const cached = await TopicAnalysisModel.findOne({ userId }).lean();
+      if (cached && cached.topics.length > 0) {
+        return cached.topics as Topic[];
+      }
+      
+      // Fallback to curated topics if cache also fails
+      return CURATED_TOPICS;
+    }
   }
-}

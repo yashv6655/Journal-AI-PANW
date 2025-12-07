@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     // Rate limiting: 30 requests per minute per user
     const rateLimitKey = `stats:${session.user.id}`;
     const rateLimitResult = rateLimit(rateLimitKey, 30, 60000);
-    
+
     if (!rateLimitResult.allowed) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
@@ -39,10 +39,10 @@ export async function GET(request: NextRequest) {
     // Calculate date range based on period
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const userSignupDate = new Date(user.createdAt);
     userSignupDate.setHours(0, 0, 0, 0);
-    
+
     let startDate = new Date();
     switch (period) {
       case 'weekly':
@@ -64,11 +64,14 @@ export async function GET(request: NextRequest) {
         startDate.setDate(today.getDate() - 7);
     }
     startDate.setHours(0, 0, 0, 0);
-    
-    // Use signup date if it's more recent than the calculated start date
+
+    // Use the earlier of signup date or calculated start date to include all entries
+    // If user signed up after the calculated start date, use signup date
+    // If user signed up before the calculated start date, use calculated start date
     if (userSignupDate > startDate) {
       startDate = userSignupDate;
     }
+    // Note: This ensures we don't show data before user signed up, but includes all data since signup
 
     const entries = await EntryModel.find({
       userId: session.user.id,
@@ -86,9 +89,9 @@ export async function GET(request: NextRequest) {
     };
 
     // Group entries by day and calculate average sentiment
-    const sentimentByDay: { [key: string]: { score: number; count: number } } = {};
+    const sentimentByDay: Record<string, { score: number; count: number }> = {};
 
-    entries.forEach((entry) => {
+    entries.forEach((entry: any) => {
       // Use local date instead of UTC to avoid timezone issues
       const entryDate = new Date(entry.createdAt);
       const date = getLocalDateString(entryDate);
@@ -102,36 +105,43 @@ export async function GET(request: NextRequest) {
     });
 
     // Generate chart data for all days in the period, including days with no entries
-    const chartData: { date: string; score: number | null; hasEntries: boolean }[] = [];
+    const chartData: Array<{
+      date: string;
+      score: number | null;
+      hasEntries: boolean;
+      entryCount?: number;
+    }> = [];
     const currentDate = new Date(startDate);
-    
+
     // Iterate through all days from startDate to today
     while (currentDate <= today) {
       const dateString = getLocalDateString(currentDate);
-      
+
       if (sentimentByDay[dateString]) {
         const data = sentimentByDay[dateString];
         chartData.push({
           date: dateString,
           score: data.count > 0 ? data.score / data.count : 0.5,
           hasEntries: true,
+          entryCount: data.count,
         });
       } else {
         // Include day with no entries (will be shown as gap in chart)
         chartData.push({
           date: dateString,
-          score: null, // Use null to create gaps in the chart
+          score: null,
           hasEntries: false,
+          entryCount: 0,
         });
       }
-      
+
       // Move to next day
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
     // Sync totalEntries with actual database count to ensure accuracy
     const actualEntryCount = await EntryModel.countDocuments({ userId: session.user.id });
-    
+
     // Update user stats if there's a discrepancy (need to fetch non-lean user for saving)
     if (user && user.stats.totalEntries !== actualEntryCount) {
       const userDoc = await UserModel.findById(session.user.id);
@@ -143,11 +153,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       stats: {
-        totalEntries: actualEntryCount,
+        totalEntries: actualEntryCount || 0,
         currentStreak: user?.stats?.currentStreak || 0,
         longestStreak: user?.stats?.longestStreak || 0,
       },
-      chartData,
+      chartData: chartData || [],
     });
   } catch (error) {
     console.error('Error fetching stats:', error);

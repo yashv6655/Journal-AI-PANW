@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Lightbulb } from 'lucide-react';
+import { TrendingUp, Lightbulb, Loader2 } from 'lucide-react';
 
 interface ThemeInsight {
   theme: string;
   frequency: number;
   sentiment: 'positive' | 'neutral' | 'negative';
-  recentMentions: number;
+  examples: string[];
+  description: string;
 }
 
 export function ThemeInsights() {
@@ -22,63 +23,15 @@ export function ThemeInsights() {
 
   const fetchThemeInsights = async () => {
     try {
-      const res = await fetch('/api/entries?limit=50');
-      if (!res.ok) throw new Error('Failed to fetch entries');
+      const res = await fetch('/api/themes?limit=50');
+      if (!res.ok) throw new Error('Failed to fetch themes');
       const data = await res.json();
       
-      // Analyze entries for recurring themes
-      const themeMap: { [key: string]: { count: number; sentiments: string[] } } = {};
-      
-      // Common theme keywords
-      const themeKeywords: { [key: string]: string[] } = {
-        'Work': ['work', 'job', 'career', 'office', 'colleague', 'boss', 'meeting', 'project'],
-        'Relationships': ['friend', 'family', 'relationship', 'partner', 'love', 'dating', 'parent'],
-        'Health': ['health', 'exercise', 'workout', 'fitness', 'diet', 'sleep', 'doctor', 'pain'],
-        'Stress': ['stress', 'anxious', 'worried', 'overwhelmed', 'pressure', 'tension'],
-        'Gratitude': ['grateful', 'thankful', 'appreciate', 'blessed', 'lucky'],
-        'Goals': ['goal', 'plan', 'achieve', 'progress', 'future', 'dream'],
-        'Creativity': ['creative', 'art', 'music', 'write', 'design', 'project'],
-        'Travel': ['travel', 'trip', 'vacation', 'journey', 'adventure'],
-      };
-
-      data.entries?.forEach((entry: any) => {
-        const content = entry.content.toLowerCase();
-        const sentiment = entry.sentiment?.overall || 'neutral';
-        
-        Object.entries(themeKeywords).forEach(([theme, keywords]) => {
-          const matches = keywords.filter(keyword => content.includes(keyword));
-          if (matches.length > 0) {
-            if (!themeMap[theme]) {
-              themeMap[theme] = { count: 0, sentiments: [] };
-            }
-            themeMap[theme].count += 1;
-            themeMap[theme].sentiments.push(sentiment);
-          }
-        });
-      });
-
-      // Convert to insights array and calculate sentiment
-      const themeInsights: ThemeInsight[] = Object.entries(themeMap)
-        .map(([theme, data]) => {
-          const positiveCount = data.sentiments.filter(s => s === 'positive').length;
-          const negativeCount = data.sentiments.filter(s => s === 'negative').length;
-          const overallSentiment = positiveCount > negativeCount ? 'positive' : 
-                                  negativeCount > positiveCount ? 'negative' : 'neutral';
-          
-          return {
-            theme,
-            frequency: data.count,
-            sentiment: overallSentiment,
-            recentMentions: data.count, // In last 50 entries
-          };
-        })
-        .filter(insight => insight.frequency >= 2) // Only show themes mentioned 2+ times
-        .sort((a, b) => b.frequency - a.frequency)
-        .slice(0, 5); // Top 5 themes
-
-      setInsights(themeInsights);
+      setInsights(data.themes || []);
     } catch (error) {
       console.error('Error fetching theme insights:', error);
+      // Fallback to empty array on error
+      setInsights([]);
     } finally {
       setLoading(false);
     }
@@ -122,18 +75,35 @@ export function ThemeInsights() {
           {insights.map((insight, idx) => (
             <div
               key={idx}
-              className="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--color-muted))]/50 border border-border"
+              className="p-4 rounded-lg bg-[hsl(var(--color-muted))]/50 border border-border"
             >
-              <div className="flex items-center gap-3">
-                <span className="font-semibold text-foreground">{insight.theme}</span>
-                <Badge variant={getSentimentVariant(insight.sentiment)} className="text-xs">
-                  {insight.sentiment}
-                </Badge>
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-foreground">{insight.theme}</span>
+                  <Badge variant={getSentimentVariant(insight.sentiment)} className="text-xs">
+                    {insight.sentiment}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <TrendingUp className="w-4 h-4" />
+                  <span>{insight.frequency} mentions</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <TrendingUp className="w-4 h-4" />
-                <span>{insight.frequency} mentions</span>
-              </div>
+              {insight.description && (
+                <p className="text-sm text-muted-foreground mb-2">{insight.description}</p>
+              )}
+              {insight.examples && insight.examples.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-border">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Examples:</p>
+                  <ul className="space-y-1">
+                    {insight.examples.slice(0, 2).map((example, i) => (
+                      <li key={i} className="text-xs text-muted-foreground italic">
+                        "{example}"
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           ))}
         </div>
