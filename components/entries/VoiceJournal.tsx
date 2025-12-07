@@ -158,12 +158,34 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
       // Could be: { role, content }, { type, text }, { message, role }, etc.
       let message: VapiMessage | null = null;
 
+      // Skip partial/interim transcripts - only process final messages
+      // Vapi sends transcript-partial for incremental updates, transcript-final for complete
+      if (data?.type && (
+        data.type.includes('partial') ||
+        data.type.includes('interim') ||
+        data.type.includes('progress')
+      )) {
+        return; // Skip incremental updates
+      }
+
       // Handle array of messages
       if (Array.isArray(data)) {
         data.forEach((msg) => {
           const parsed = parseMessage(msg);
           if (parsed) {
-            setMessages((prev) => [...prev, parsed]);
+            setMessages((prev) => {
+              // Check if this is an update to the last message of the same role
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.role === parsed.role) {
+                // If new message starts with or contains last message, it's likely an update
+                if (parsed.content.includes(lastMsg.content) || lastMsg.content.includes(parsed.content)) {
+                  // Replace the last message with the newer, more complete one
+                  return [...prev.slice(0, -1), parsed];
+                }
+              }
+              // Otherwise add as new message
+              return [...prev, parsed];
+            });
             // Track user messages for silence detection
             if (parsed.role === 'user') {
               lastUserMessageTimeRef.current = Date.now();
@@ -178,14 +200,22 @@ export function VoiceJournal({ dailyPrompt, onEntryCreated, onError }: VoiceJour
       message = parseMessage(data);
       if (message && message.content) {
         setMessages((prev) => {
-          // Avoid duplicates by checking last message
+          // Check if this is an incremental update of the last message
           const lastMsg = prev[prev.length - 1];
-          if (lastMsg && lastMsg.content === message!.content && lastMsg.role === message!.role) {
-            return prev;
+          if (lastMsg && lastMsg.role === message!.role) {
+            // If exact duplicate, skip
+            if (lastMsg.content === message!.content) {
+              return prev;
+            }
+            // If new message contains or extends the last message, replace it
+            if (message!.content.includes(lastMsg.content) || lastMsg.content.includes(message!.content)) {
+              return [...prev.slice(0, -1), message!];
+            }
           }
+          // Otherwise add as new message
           return [...prev, message!];
         });
-        
+
         // Track user messages for silence detection
         if (message.role === 'user') {
           lastUserMessageTimeRef.current = Date.now();

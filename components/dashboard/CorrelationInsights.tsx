@@ -75,7 +75,7 @@ export function CorrelationInsights() {
         <p className="text-sm text-muted-foreground mb-4">
           Discovered relationships between your activities and emotions
         </p>
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
           {correlations.map((correlation, idx) => (
             <div
               key={idx}

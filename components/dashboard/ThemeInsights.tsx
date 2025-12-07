@@ -71,7 +71,7 @@ export function ThemeInsights() {
         <p className="text-sm text-muted-foreground mb-4">
           Topics you've written about frequently in your recent entries
         </p>
-        <div className="space-y-3">
+        <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
           {insights.map((insight, idx) => (
             <div
               key={idx}

@@ -48,6 +48,7 @@ type TimePeriod = 'weekly' | 'monthly' | '3months' | '6months' | '1year';
 
 export function EmotionChart() {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [allEntryScores, setAllEntryScores] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<TimePeriod>('weekly');
 
@@ -59,6 +60,7 @@ export function EmotionChart() {
         if (!res.ok) throw new Error('Failed to fetch chart data');
         const data = await res.json();
         setChartData(data.chartData || []);
+        setAllEntryScores(data.allEntryScores || []);
       } catch (error) {
         console.error('Error fetching chart data:', error);
       } finally {
@@ -91,16 +93,18 @@ export function EmotionChart() {
     const validScores = chartData
       .filter((point) => point.score !== null && point.hasEntries)
       .map((point) => point.score!);
-    
+
     if (validScores.length === 0) {
       return null;
     }
 
     const average = validScores.reduce((a, b) => a + b, 0) / validScores.length;
     const trend = calculateTrend(validScores);
-    const mostCommon = getMostCommonMood(validScores);
+    // Use individual entry scores for "Most Common Mood" instead of daily averages
+    const mostCommon = getMostCommonMood(allEntryScores.length > 0 ? allEntryScores : validScores);
     const daysWithEntries = chartData.filter((p) => p.hasEntries).length;
     const totalDays = chartData.length;
+    const totalEntries = chartData.reduce((sum, point) => sum + (point.entryCount || 0), 0);
 
     return {
       average,
@@ -108,8 +112,10 @@ export function EmotionChart() {
       mostCommon,
       daysWithEntries,
       totalDays,
+      totalEntries,
+      validScores,
     };
-  }, [chartData]);
+  }, [chartData, allEntryScores]);
 
   if (loading) {
     return (
@@ -331,16 +337,16 @@ export function EmotionChart() {
           font: {
             size: 11,
           },
-          stepSize: 0.1,
+          stepSize: 0.2,
           callback: function (value: any) {
-            // Show zone labels at key thresholds
-            if (value === 0.85) return 'Very Positive 😊';
-            if (value === 0.7) return 'Positive 🙂';
-            if (value === 0.4) return 'Neutral 😐';
-            if (value === 0.3) return 'Negative 😟';
-            if (value === 0) return 'Very Negative 😔';
-            // For other values, show percentage
-            return `${(value * 100).toFixed(0)}%`;
+            // Show only mood labels at key thresholds
+            if (value === 1.0) return 'Very Positive 😊';
+            if (value === 0.8) return 'Positive 🙂';
+            if (value === 0.6) return 'Neutral 😐';
+            if (value === 0.4) return 'Negative 😟';
+            if (value === 0.2) return 'Very Negative 😔';
+            if (value === 0) return '';
+            return ''; // Hide all other tick labels
           },
         },
       },
@@ -376,9 +382,6 @@ export function EmotionChart() {
                   <p className="text-lg font-semibold text-foreground">
                     {getMoodLabel(summaryStats.average)} {getMoodEmoji(summaryStats.average)}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formatScore(summaryStats.average)}
-                  </p>
                 </div>
               </div>
             </CardContent>
@@ -387,7 +390,7 @@ export function EmotionChart() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="w-full">
                   <p className="text-xs text-muted-foreground mb-1">Trend</p>
                   <div className="flex items-center gap-2">
                     {summaryStats.trend.direction === 'improving' && (
@@ -416,7 +419,7 @@ export function EmotionChart() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {summaryStats.trend.percentage.toFixed(1)}% change
+                    {summaryStats.validScores && summaryStats.validScores.length < 2 ? 'Need more entries to show trend' : 'compared to earlier period'}
                   </p>
                 </div>
               </div>
@@ -427,7 +430,7 @@ export function EmotionChart() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Most Common</p>
+                  <p className="text-xs text-muted-foreground mb-1">Most Common Mood</p>
                   <div className="flex items-center gap-2">
                     {summaryStats.mostCommon.mood === 'positive' && (
                       <Smile className="w-4 h-4 text-[hsl(var(--color-positive))]" />
@@ -456,10 +459,10 @@ export function EmotionChart() {
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Activity</p>
                   <p className="text-lg font-semibold text-foreground">
-                    {summaryStats.daysWithEntries} / {summaryStats.totalDays}
+                    {summaryStats.totalEntries}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    days with entries
+                    {summaryStats.totalEntries === 1 ? 'entry' : 'entries'} ({summaryStats.daysWithEntries} {summaryStats.daysWithEntries === 1 ? 'day' : 'days'})
                   </p>
                 </div>
               </div>
@@ -495,15 +498,15 @@ export function EmotionChart() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-[hsl(var(--color-negative))] opacity-60"></div>
-              <span className="text-muted-foreground">Negative (0-40%)</span>
+              <span className="text-muted-foreground">Negative</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-gray-400 opacity-60"></div>
-              <span className="text-muted-foreground">Neutral (40-70%)</span>
+              <span className="text-muted-foreground">Neutral</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-[hsl(var(--color-positive))] opacity-60"></div>
-              <span className="text-muted-foreground">Positive (70-100%)</span>
+              <span className="text-muted-foreground">Positive</span>
             </div>
           </div>
         </div>

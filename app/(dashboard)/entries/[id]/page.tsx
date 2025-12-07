@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SentimentBadge } from '@/components/entries/SentimentBadge';
-import { ArrowLeft, Calendar, FileText, Loader2, Trash2, Mic } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Loader2, Trash2, Mic, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatDate, formatRelativeTime } from '@/lib/utils';
 
 interface Entry {
@@ -41,6 +41,7 @@ export default function EntryDetailPage() {
   const [entry, setEntry] = useState<Entry | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(true);
 
   useEffect(() => {
     fetchEntry();
@@ -207,13 +208,27 @@ export default function EntryDetailPage() {
             </div>
             
             {/* Show full transcript for voice entries */}
-            {entry.metadata.entryType === 'voice' && entry.metadata.fullTranscript && 
-             Array.isArray(entry.metadata.fullTranscript) && 
+            {entry.metadata.entryType === 'voice' && entry.metadata.fullTranscript &&
+             Array.isArray(entry.metadata.fullTranscript) &&
              entry.metadata.fullTranscript.length > 0 ? (
               <div className="space-y-4">
                 <div className="p-4 bg-[hsl(var(--color-muted))]/30 rounded-lg border border-border">
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Full Conversation</h3>
-                  <div className="space-y-3">
+                  <button
+                    onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
+                    className="w-full flex items-center justify-between text-sm font-semibold text-foreground mb-3 hover:opacity-70 transition-opacity"
+                  >
+                    <span>Full Conversation ({entry.metadata.fullTranscript.length} messages)</span>
+                    {isTranscriptExpanded ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </button>
+                  <div
+                    className={`space-y-3 overflow-y-auto transition-all duration-200 ${
+                      isTranscriptExpanded ? 'max-h-[600px]' : 'max-h-[200px]'
+                    }`}
+                  >
                     {entry.metadata.fullTranscript.map((msg: any, idx: number) => (
                       <div
                         key={idx}
@@ -238,6 +253,16 @@ export default function EntryDetailPage() {
                       </div>
                     ))}
                   </div>
+                  {!isTranscriptExpanded && (
+                    <div className="mt-2 text-center">
+                      <button
+                        onClick={() => setIsTranscriptExpanded(true)}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Click to expand full conversation
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="p-4 bg-[hsl(var(--color-muted))]/20 rounded-lg border border-border">
                   <h3 className="text-sm font-semibold text-foreground mb-2">Your Journal Entry</h3>

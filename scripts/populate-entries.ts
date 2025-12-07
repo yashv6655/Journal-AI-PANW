@@ -2,7 +2,7 @@ import { connectDB } from '@/lib/db';
 import EntryModel from '@/models/Entry';
 import UserModel from '@/models/User';
 
-const userId = '6934ce003f45fc9488d586c1';
+const userId = '6934e2fc17633648d5f18d80';
 
 // Diverse journal entries with varying themes and emotions
 const journalTemplates = [
@@ -141,8 +141,8 @@ async function populateEntries() {
     const today = new Date();
     today.setHours(23, 59, 59, 999); // End of today
 
-    // Distribute 15 entries across 7 days (2-3 entries per day)
-    const entriesPerDay = [2, 2, 3, 2, 2, 2, 2]; // Total = 15
+    // Distribute 10 entries across 7 days (1-2 entries per day)
+    const entriesPerDay = [1, 2, 1, 2, 1, 2, 1]; // Total = 10
 
     let templateIndex = 0;
 

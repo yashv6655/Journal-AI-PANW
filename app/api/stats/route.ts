@@ -40,9 +40,6 @@ export async function GET(request: NextRequest) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const userSignupDate = new Date(user.createdAt);
-    userSignupDate.setHours(0, 0, 0, 0);
-
     let startDate = new Date();
     switch (period) {
       case 'weekly':
@@ -65,14 +62,6 @@ export async function GET(request: NextRequest) {
     }
     startDate.setHours(0, 0, 0, 0);
 
-    // Use the earlier of signup date or calculated start date to include all entries
-    // If user signed up after the calculated start date, use signup date
-    // If user signed up before the calculated start date, use calculated start date
-    if (userSignupDate > startDate) {
-      startDate = userSignupDate;
-    }
-    // Note: This ensures we don't show data before user signed up, but includes all data since signup
-
     const entries = await EntryModel.find({
       userId: session.user.id,
       createdAt: { $gte: startDate },
@@ -91,6 +80,9 @@ export async function GET(request: NextRequest) {
     // Group entries by day and calculate average sentiment
     const sentimentByDay: Record<string, { score: number; count: number }> = {};
 
+    // Also collect all individual entry scores for accurate mood statistics
+    const allEntryScores: number[] = [];
+
     entries.forEach((entry: any) => {
       // Use local date instead of UTC to avoid timezone issues
       const entryDate = new Date(entry.createdAt);
@@ -101,6 +93,7 @@ export async function GET(request: NextRequest) {
       if (entry.sentiment) {
         sentimentByDay[date].score += entry.sentiment.score;
         sentimentByDay[date].count += 1;
+        allEntryScores.push(entry.sentiment.score);
       }
     });
 
@@ -158,6 +151,7 @@ export async function GET(request: NextRequest) {
         longestStreak: user?.stats?.longestStreak || 0,
       },
       chartData: chartData || [],
+      allEntryScores: allEntryScores || [], // Individual entry scores for accurate statistics
     });
   } catch (error) {
     console.error('Error fetching stats:', error);
