@@ -70,22 +70,9 @@ export function EmotionChart() {
 
     fetchChartData();
     
-    // Refresh chart data when window regains focus (user might have created new entries)
-    const handleFocus = () => {
-      fetchChartData();
-    };
-    
-    window.addEventListener('focus', handleFocus);
-    
-    // Also refresh periodically (every 30 seconds) to catch updates
-    const interval = setInterval(() => {
-      fetchChartData();
-    }, 30000);
-    
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      clearInterval(interval);
-    };
+    // No automatic refresh - chart updates only when:
+    // 1. Component mounts
+    // 2. Period changes
   }, [period]);
 
   // Calculate summary statistics - MUST be before any conditional returns (Rules of Hooks)
