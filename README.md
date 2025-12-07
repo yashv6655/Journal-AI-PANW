@@ -4,7 +4,7 @@ AI-powered journaling companion with sentiment analysis, writing prompts, and em
 
 ## Presentation Video
 
-<https://www.youtube.com/watch?v=BYN0yTe9zlI>
+<https://youtu.be/o-0frjaqyWs>
 
 ## Features
 
