@@ -85,3 +85,15 @@ export interface WritingPromptResponse {
   question?: string; // For follow-up questions
   sentiment?: SentimentResult;
 }
+
+export interface VapiMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: number;
+}
+
+export interface VapiTranscript {
+  messages: VapiMessage[];
+  callId?: string;
+  duration?: number;
+}

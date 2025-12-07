@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { content, prompt, tags } = await request.json();
+    const { content, prompt, tags, fullTranscript, entryType } = await request.json();
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json(
@@ -93,6 +93,8 @@ export async function POST(request: NextRequest) {
         wordCount,
         prompt,
         timeOfDay: getTimeOfDay(),
+        entryType: entryType || 'text', // 'text' or 'voice'
+        fullTranscript: fullTranscript || undefined, // Store full transcript for voice entries
       },
       tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
     });
@@ -131,7 +133,24 @@ export async function POST(request: NextRequest) {
     const user = await UserModel.findById(session.user.id);
     if (user) {
       user.stats.totalEntries += 1;
-      await user.updateStreak();
+      await user.updateStreak(); // This saves the user, so totalEntries will be saved too
+    }
+
+    // Invalidate analysis caches - will be regenerated on next request
+    // We don't regenerate here to avoid blocking the entry creation response
+    try {
+      const ThemeAnalysisModel = (await import('@/models/ThemeAnalysis')).default;
+      const CorrelationAnalysisModel = (await import('@/models/CorrelationAnalysis')).default;
+      const TopicAnalysisModel = (await import('@/models/TopicAnalysis')).default;
+      
+      await Promise.all([
+        ThemeAnalysisModel.deleteOne({ userId: session.user.id }),
+        CorrelationAnalysisModel.deleteOne({ userId: session.user.id }),
+        TopicAnalysisModel.deleteOne({ userId: session.user.id }),
+      ]);
+    } catch (error) {
+      // Non-critical, just log
+      console.warn('Failed to invalidate analysis caches:', error);
     }
 
     return NextResponse.json({ entry }, { status: 201 });

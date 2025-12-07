@@ -38,16 +38,27 @@ ${entrySummaries.join('\n\n---\n\n')}
 
 Provide a response in JSON format with:
 1. "summary": A gentle 2-3 sentence summary of the week's emotional themes
-2. "insights": An array of 3-5 specific observations or patterns you noticed (as strings)
-3. "reflection": One encouraging question or reflection for the coming week
+2. "insights": An array of 3-5 specific observations or patterns you noticed (as strings). These should identify concrete correlations, such as:
+   - "You mentioned feeling most energized on days you had a morning walk"
+   - "On days you wrote about work stress, your entries were more negative"
+   - "You wrote about creative ideas more frequently during weeks with exercise"
+   - "Your mood improved significantly after entries mentioning time with friends"
+   Include specific examples from the entries when possible.
+3. "correlations": An array of 2-3 specific correlations you discovered (as strings), formatted like:
+   - "On days you mentioned [activity/event], your entries were [X]% more [positive/negative]"
+   - "You felt most [emotion] when [specific context or activity]"
+   - "There's a pattern: [specific observation with concrete example]"
+4. "reflection": One encouraging question or reflection for the coming week
 
 Focus on:
 - Emotional patterns and themes
-- Connections between events and feelings
+- Specific correlations between activities, events, and emotions
+- Connections between events and feelings with concrete examples
 - Progress or growth moments
 - Self-care and coping strategies observed
+- Non-obvious patterns that help the user understand themselves better
 
-Keep the tone warm, non-judgmental, and empowering.`;
+Keep the tone warm, non-judgmental, and empowering. Be specific and concrete in your observations.`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -63,7 +74,14 @@ Keep the tone warm, non-judgmental, and empowering.`;
     const result = JSON.parse(response.choices[0].message.content || '{}');
 
     // Combine summary and reflection into content
-    const content = `${result.summary}\n\n${result.reflection || ''}`;
+    let content = `${result.summary}\n\n`;
+    
+    // Add correlations section if available
+    if (result.correlations && Array.isArray(result.correlations) && result.correlations.length > 0) {
+      content += `Key Connections:\n${result.correlations.map((c: string) => `• ${c}`).join('\n')}\n\n`;
+    }
+    
+    content += result.reflection || '';
 
     return {
       userId,

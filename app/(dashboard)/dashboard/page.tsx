@@ -9,6 +9,8 @@ import { StatsGrid } from '@/components/dashboard/StatsGrid';
 import { EntryList } from '@/components/dashboard/EntryList';
 import { EmotionChart } from '@/components/dashboard/EmotionChart';
 import { ThemeInsights } from '@/components/dashboard/ThemeInsights';
+import { GoalSelector } from '@/components/dashboard/GoalSelector';
+import { CorrelationInsights } from '@/components/dashboard/CorrelationInsights';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp } from 'lucide-react';
 
@@ -30,6 +32,9 @@ export default async function DashboardPage() {
     .limit(5)
     .lean();
 
+  // Sync totalEntries with actual database count
+  const actualEntryCount = await EntryModel.countDocuments({ userId: session.user.id });
+
   // Convert MongoDB documents to plain objects
   const plainEntries = entries.map((entry) => ({
     ...entry,
@@ -39,10 +44,10 @@ export default async function DashboardPage() {
     updatedAt: entry.updatedAt.toISOString(),
   }));
 
-  const stats = user?.stats || {
-    totalEntries: 0,
-    currentStreak: 0,
-    longestStreak: 0,
+  const stats = {
+    totalEntries: actualEntryCount, // Use actual count from database
+    currentStreak: user?.stats?.currentStreak || 0,
+    longestStreak: user?.stats?.longestStreak || 0,
   };
 
   return (
@@ -82,8 +87,14 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Goal Selector */}
+      <GoalSelector />
+
       {/* Theme Insights */}
       <ThemeInsights />
+
+      {/* Correlation Insights */}
+      <CorrelationInsights />
 
       {/* Recent Entries */}
       <div>

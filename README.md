@@ -34,10 +34,13 @@ Your empathetic AI companion that transforms journaling from a blank page into a
    npm install
    ```
 
-2. **Environment variables are already set up** in `.env.local`:
-   - ✅ MongoDB URI
-   - ✅ NextAuth Secret
-   - ✅ OpenAI API Key
+2. **Environment variables** in `.env.local`:
+   - `MONGODB_URI` - MongoDB connection string
+   - `NEXTAUTH_SECRET` - NextAuth session secret
+   - `NEXTAUTH_URL` - Your app URL (e.g., http://localhost:3000)
+   - `OPENAI_API_KEY` - OpenAI API key for sentiment analysis
+   - `NEXT_PUBLIC_VAPI_PUBLIC_KEY` - Vapi public key for voice journaling (client-side)
+   - `VAPI_PRIVATE_KEY` - Vapi private key for server-side operations (optional)
 
 3. **Run the development server**:
    ```bash
@@ -126,7 +129,7 @@ npm start
 npm run lint
 ```
 
-## Features Implemented ✅
+## Features Implemented
 
 - [x] User authentication (signup/login)
 - [x] Journal entry creation
@@ -146,6 +149,8 @@ npm run lint
    - `NEXTAUTH_SECRET`
    - `NEXTAUTH_URL`
    - `OPENAI_API_KEY`
+   - `NEXT_PUBLIC_VAPI_PUBLIC_KEY` (for voice journaling)
+   - `VAPI_PRIVATE_KEY` (optional, for webhooks)
 4. Deploy
 
 ## Troubleshooting
@@ -167,5 +172,3 @@ npm run lint
 MIT
 
 ---
-
-**Made with ❤️ and AI** - Your thoughts, your privacy, your growth.

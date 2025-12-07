@@ -65,6 +65,21 @@ const EntrySchema = new Schema<IEntry>({
       enum: ['morning', 'afternoon', 'evening', 'night'],
       required: true,
     },
+    entryType: {
+      type: String,
+      enum: ['text', 'voice'],
+      default: 'text',
+    },
+    fullTranscript: {
+      type: [
+        {
+          role: String,
+          content: String,
+          timestamp: Number,
+        },
+      ],
+      default: undefined,
+    },
   },
   tags: {
     type: [String],
