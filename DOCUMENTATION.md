@@ -63,10 +63,9 @@ AI analysis results (themes, correlations, topics) cached in MongoDB and invalid
 - Environment variables for sensitive keys
 - Input validation and MongoDB injection prevention
 
-## Performance
-
-- Database indexing on userId, createdAt, tags
-- Lean queries for read operations
-- Client-side caching with refresh intervals
-- Debounced API calls for writing prompts
-- Parallel processing where possible
+## Future Enhancements
+- More visualizations
+- More Personable Messages and Prompts
+- Less reliability on OpenAI
+- Reminder eMails regarding streak loss or Reminder to Come Back to Platform for User Retention
+- Enable metrics for the website, PostHog or Vercel to See User Interactions
