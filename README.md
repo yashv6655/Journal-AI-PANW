@@ -1,174 +1,126 @@
-# Journal AI - AI-Powered Journaling Companion
+# Journal AI
 
-Your empathetic AI companion that transforms journaling from a blank page into a conversation.
+AI-powered journaling companion with sentiment analysis, writing prompts, and emotional trend tracking.
 
-## Features ✨
+## Presentation Video
 
-- **AI-Powered Prompts**: Context-aware questions tailored to your recent entries
-- **Sentiment Analysis**: Real-time emotional feedback on every entry
-- **Emotional Trends**: Visualize your mood patterns over time
-- **Weekly Summaries**: AI-generated insights about your journaling journey
-- **Streak Tracking**: Stay motivated with daily streak counters
-- **Privacy First**: Secure encryption and transparent AI processing
+[Link to your 5-7 minute presentation video (YouTube/Vimeo)]
+
+Upload your presentation video to YouTube or Vimeo and add the link above. The video should cover the problem, solution, live demo, and key learnings.
+
+## Features
+
+- Context-aware AI prompts based on recent entries
+- Real-time sentiment analysis
+- Emotional trend visualization
+- Voice journaling with AI assistant
+- Theme extraction and correlation insights
+- Weekly summaries
+- Streak tracking
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, React 19, TypeScript, Tailwind CSS
-- **Backend**: Next.js API Routes, NextAuth.js
-- **Database**: MongoDB Atlas
-- **AI**: OpenAI GPT-4o-mini
-- **Deployment**: Vercel
+- Frontend: Next.js 16, TypeScript, Tailwind CSS, Chart.js, Vapi SDK
+- Backend: Next.js API Routes, Node.js
+- Database: MongoDB
+- Authentication: NextAuth.js
+- AI: OpenAI GPT-4o-mini
+- Deployment: Vercel
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- MongoDB Atlas account (already configured)
-- OpenAI API key (already configured)
+- MongoDB Atlas account
+- OpenAI API key
 
 ### Installation
 
-1. **Install dependencies**:
+1. Install dependencies:
    ```bash
    npm install
    ```
 
-2. **Environment variables** in `.env.local`:
-   - `MONGODB_URI` - MongoDB connection string
-   - `NEXTAUTH_SECRET` - NextAuth session secret
-   - `NEXTAUTH_URL` - Your app URL (e.g., http://localhost:3000)
-   - `OPENAI_API_KEY` - OpenAI API key for sentiment analysis
-   - `NEXT_PUBLIC_VAPI_PUBLIC_KEY` - Vapi public key for voice journaling (client-side)
-   - `VAPI_PRIVATE_KEY` - Vapi private key for server-side operations (optional)
+2. Create `.env.local` with required environment variables:
+   ```
+   MONGODB_URI=<your-mongodb-connection-string>
+   NEXTAUTH_SECRET=<your-nextauth-secret>
+   NEXTAUTH_URL=http://localhost:3000
+   OPENAI_API_KEY=<your-openai-api-key>
+   NEXT_PUBLIC_VAPI_PUBLIC_KEY=<your-vapi-public-key>
+   VAPI_PRIVATE_KEY=<your-vapi-private-key>
+   ```
 
-3. **Run the development server**:
+3. Run development server:
    ```bash
    npm run dev
    ```
 
-4. **Open your browser**:
-   ```
-   http://localhost:3000
-   ```
-
-## Usage
-
-### 1. Create an Account
-- Click "Get Started" on the landing page
-- Sign up with email and password
-
-### 2. Write Your First Entry
-- You'll see an AI-generated prompt on your dashboard
-- Click "Start Writing" to create your first entry
-- The AI will analyze your sentiment in real-time
-
-### 3. View Your Insights
-- Check your emotional trends on the dashboard
-- Track your journaling streak
-- Generate weekly summaries to see patterns
+4. Open http://localhost:3000
 
 ## Project Structure
 
 ```
-journal-ai/
-├── app/
-│   ├── (auth)/              # Authentication pages
-│   │   ├── login/
-│   │   └── signup/
-│   ├── (dashboard)/         # Protected dashboard routes
-│   │   ├── dashboard/
-│   │   ├── entries/
-│   │   └── layout.tsx
-│   ├── api/                 # API routes
-│   │   ├── auth/
-│   │   ├── entries/
-│   │   ├── prompts/
-│   │   ├── summaries/
-│   │   └── stats/
-│   └── page.tsx             # Landing page
-├── components/
-│   ├── ui/                  # Base UI components
-│   ├── dashboard/           # Dashboard components
-│   └── entries/             # Entry components
-├── lib/
-│   ├── db.ts                # MongoDB connection
-│   ├── openai.ts            # OpenAI client
-│   ├── auth.ts              # NextAuth config
-│   └── utils.ts             # Utilities
-├── models/                  # Mongoose models
-├── services/                # AI services
-└── types/                   # TypeScript types
+app/
+├── (auth)/          # Authentication pages
+├── (dashboard)/     # Protected dashboard routes
+├── api/             # API routes
+└── page.tsx         # Landing page
+
+components/
+├── ui/              # Base UI components
+├── dashboard/       # Dashboard components
+└── entries/         # Entry components
+
+lib/                 # Utilities and clients
+models/              # Mongoose models
+services/            # AI services
+types/               # TypeScript types
 ```
 
 ## API Routes
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/signup` | POST | Create new user account |
-| `/api/auth/[...nextauth]` | POST | Sign in/out |
-| `/api/entries` | GET | Fetch user entries |
-| `/api/entries` | POST | Create entry + sentiment |
-| `/api/prompts` | POST | Generate AI prompt |
-| `/api/summaries` | GET/POST | Summaries |
-| `/api/stats` | GET | User stats + chart data |
+- `POST /api/entries` - Create entry
+- `GET /api/entries` - List entries with pagination
+- `GET /api/entries/[id]` - Get single entry
+- `GET /api/stats` - Get statistics and chart data
+- `GET /api/prompts` - Get daily prompt
+- `GET /api/writing-prompts` - Generate writing prompt
+- `GET /api/themes` - Get theme insights
+- `GET /api/correlations` - Get correlation insights
+- `POST /api/vapi/webhook` - Vapi webhook endpoint
 
-## Development Commands
+## Development
 
 ```bash
-# Run development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
-
-# Lint code
-npm run lint
+npm run dev      # Start development server
+npm run build    # Build for production
+npm start        # Start production server
+npm run lint     # Lint code
 ```
 
-## Features Implemented
+## Deployment
 
-- [x] User authentication (signup/login)
-- [x] Journal entry creation
-- [x] AI-powered contextual prompts
-- [x] Real-time sentiment analysis
-- [x] Entry history
-- [x] Streak tracking
-- [x] Dashboard with stats
-- [x] Weekly AI summaries (API ready)
-
-## Deployment to Vercel
-
-1. Push to GitHub
+1. Push code to GitHub
 2. Import repository to Vercel
-3. Add environment variables:
-   - `MONGODB_URI`
-   - `NEXTAUTH_SECRET`
-   - `NEXTAUTH_URL`
-   - `OPENAI_API_KEY`
-   - `NEXT_PUBLIC_VAPI_PUBLIC_KEY` (for voice journaling)
-   - `VAPI_PRIVATE_KEY` (optional, for webhooks)
+3. Configure environment variables in Vercel dashboard
 4. Deploy
 
 ## Troubleshooting
 
-### MongoDB Connection Issues
+**MongoDB Connection Issues**
 - Verify MongoDB URI in `.env.local`
 - Check IP whitelist in MongoDB Atlas
 
-### OpenAI API Errors
+**OpenAI API Errors**
 - Verify API key in `.env.local`
 - Check OpenAI account credits
 
-### Build Errors
+**Build Errors**
 - Delete `.next` and `node_modules`
 - Run `npm install` again
 
 ## License
 
 MIT
-
----

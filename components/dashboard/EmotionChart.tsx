@@ -422,7 +422,7 @@ export function EmotionChart() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {summaryStats.validScores && summaryStats.validScores.length < 2 ? 'Need more entries to show trend' : 'compared to earlier period'}
+                    {summaryStats.validScores && summaryStats.validScores.length < 2 ? 'Need more entries to show trend' : ''}
                   </p>
                 </div>
               </div>
